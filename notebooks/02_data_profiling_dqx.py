@@ -331,7 +331,7 @@ print("These rows will be flagged/dropped in Silver layer.")
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_chicago)
+dbutils.data.summarize(df_chicago.select("*"))
 
 # COMMAND ----------
 
@@ -340,7 +340,7 @@ dbutils.data.summarize(df_chicago)
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_dallas)
+dbutils.data.summarize(df_dallas.select("*"))
 
 # COMMAND ----------
 
