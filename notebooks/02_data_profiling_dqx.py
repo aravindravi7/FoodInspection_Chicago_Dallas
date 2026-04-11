@@ -355,8 +355,9 @@ dbutils.data.summarize(df_dallas_raw)
 # COMMAND ----------
 
 from databricks.labs.dqx.engine import DQEngine
+from databricks.sdk import WorkspaceClient
 
-dq_engine = DQEngine(spark)
+dq_engine = DQEngine(WorkspaceClient())
 
 # COMMAND ----------
 
@@ -377,7 +378,7 @@ chicago_checks = [
     {"name": "chicago_license_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "License"}}},
 ]
 
-chicago_valid, chicago_quarantine = dq_engine.apply_checks(df_chicago, chicago_checks)
+chicago_valid, chicago_quarantine = dq_engine.apply_checks_and_split(df_chicago, chicago_checks)
 
 print(f"Chicago - Valid rows: {chicago_valid.count()}, Quarantined rows: {chicago_quarantine.count()}")
 
@@ -403,7 +404,7 @@ dallas_checks = [
     {"name": "dallas_street_address_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Street_Address"}}},
 ]
 
-dallas_valid, dallas_quarantine = dq_engine.apply_checks(df_dallas, dallas_checks)
+dallas_valid, dallas_quarantine = dq_engine.apply_checks_and_split(df_dallas, dallas_checks)
 
 print(f"Dallas - Valid rows: {dallas_valid.count()}, Quarantined rows: {dallas_quarantine.count()}")
 
