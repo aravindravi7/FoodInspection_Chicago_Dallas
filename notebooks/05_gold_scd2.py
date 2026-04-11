@@ -60,7 +60,7 @@ def apply_scd2_restaurant():
         df_chi.select(
             col("DBA_Name").alias("restaurant_name"),
             col("AKA_Name").alias("aka_name"),
-            col("License_").cast("string").alias("license_number"),
+            col("License").cast("string").alias("license_number"),
             col("Facility_Type").alias("facility_type"),
             col("Risk").alias("risk_category"),
             col("source_city")

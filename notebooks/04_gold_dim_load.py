@@ -132,7 +132,7 @@ df_chi_restaurants = (
     df_chi_insp.select(
         col("DBA_Name").alias("restaurant_name"),
         col("AKA_Name").alias("aka_name"),
-        col("License_").cast("string").alias("license_number"),
+        col("License").cast("string").alias("license_number"),
         col("Facility_Type").alias("facility_type"),
         col("Risk").alias("risk_category"),
         col("source_city")
@@ -335,7 +335,7 @@ df_chi_fact = (
     .join(
         dim_restaurant.filter(col("is_current") == True).select("restaurant_key", "restaurant_name", "license_number", "source_city"),
         (df_chi_insp["DBA_Name"] == dim_restaurant["restaurant_name"]) &
-        (df_chi_insp["License_"].cast("string") == dim_restaurant["license_number"]) &
+        (df_chi_insp["License"].cast("string") == dim_restaurant["license_number"]) &
         (df_chi_insp["source_city"] == dim_restaurant["source_city"]),
         "left"
     )

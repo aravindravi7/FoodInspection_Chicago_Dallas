@@ -375,7 +375,7 @@ display(dallas_profile)
 # MAGIC |---|---|---|---|
 # MAGIC | Restaurant Name | `DBA_Name` | `Restaurant_Name` | Direct mapping |
 # MAGIC | Also Known As | `AKA_Name` | N/A | Chicago only |
-# MAGIC | License # | `License_` | N/A | Chicago only |
+# MAGIC | License # | `License` | N/A | Chicago only |
 # MAGIC | Facility Type | `Facility_Type` | N/A | Chicago only |
 # MAGIC | Risk Category | `Risk` | N/A | Chicago only |
 # MAGIC | Inspection Date | `Inspection_Date` | `Inspection_Date` | Direct mapping |
