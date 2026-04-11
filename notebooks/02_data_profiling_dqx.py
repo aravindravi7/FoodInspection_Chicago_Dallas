@@ -314,7 +314,31 @@ print("These rows will be flagged/dropped in Silver layer.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. DQX Profiling
+# MAGIC ## 4. Visual Data Summarization (Built-in Profiling)
+# MAGIC These generate rich visual profiling reports directly in the notebook.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 4.1 Chicago - Visual Summary
+
+# COMMAND ----------
+
+dbutils.data.summarize(df_chicago)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 4.2 Dallas - Visual Summary
+
+# COMMAND ----------
+
+dbutils.data.summarize(df_dallas)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5. DQX Profiling
 
 # COMMAND ----------
 
@@ -325,7 +349,7 @@ profiler = DQProfiler(spark)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4.1 DQX Profile - Chicago
+# MAGIC ### 5.1 DQX Profile - Chicago
 
 # COMMAND ----------
 
@@ -335,7 +359,7 @@ display(chicago_profile)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 4.2 DQX Profile - Dallas
+# MAGIC ### 5.2 DQX Profile - Dallas
 
 # COMMAND ----------
 
@@ -345,7 +369,7 @@ display(dallas_profile)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Common Attributes Mapping (for merging)
+# MAGIC ## 6. Common Attributes Mapping (for merging)
 # MAGIC
 # MAGIC | Concept | Chicago Column | Dallas Column | Notes |
 # MAGIC |---|---|---|---|
@@ -369,7 +393,7 @@ display(dallas_profile)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. Data Quality Summary
+# MAGIC ## 7. Data Quality Summary
 # MAGIC
 # MAGIC ### Chicago Issues Found:
 # MAGIC - Violations stored as unstructured pipe-delimited text (needs parsing)

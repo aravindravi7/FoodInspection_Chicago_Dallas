@@ -19,10 +19,20 @@ from pyspark.sql.functions import (
     col, trim, upper, lower, when, lit, regexp_replace, regexp_extract,
     to_date, split, explode, posexplode, array, struct, expr,
     monotonically_increasing_id, concat_ws, coalesce, length,
-    count, sum as spark_sum, row_number
+    count, sum as spark_sum, row_number, current_timestamp, md5, sha2
 )
 from pyspark.sql.window import Window
 from pyspark.sql.types import IntegerType, DoubleType, StringType
+
+# COMMAND ----------
+
+def add_silver_lineage(df, key_columns):
+    """Add Silver layer lineage columns: updated_at and durability_key (hash of business key columns)."""
+    return (
+        df
+        .withColumn("updated_at", current_timestamp())
+        .withColumn("durability_key", sha2(concat_ws("||", *[coalesce(col(c).cast("string"), lit("NULL")) for c in key_columns]), 256))
+    )
 
 # COMMAND ----------
 
@@ -178,6 +188,8 @@ display(
 
 # Silver - Chicago inspections (one row per inspection)
 df_chicago_silver = df_chicago_clean.drop("Violations")  # violations stored separately
+# Add lineage: updated_at + durability_key (hash of business key)
+df_chicago_silver = add_silver_lineage(df_chicago_silver, ["Inspection_ID", "DBA_Name", "Inspection_Date"])
 
 (
     df_chicago_silver.write
@@ -191,12 +203,17 @@ print(f"Silver Chicago inspections: {df_chicago_silver.count()} rows")
 # COMMAND ----------
 
 # Silver - Chicago violations (one row per violation per inspection)
-(
+df_chicago_violations_out = (
     df_chicago_violations
     .select(
         "Inspection_ID", "violation_code", "violation_description",
         "violation_comments", "violation_points", "source_city"
     )
+)
+df_chicago_violations_out = add_silver_lineage(df_chicago_violations_out, ["Inspection_ID", "violation_code"])
+
+(
+    df_chicago_violations_out
     .write
     .format("delta")
     .mode("overwrite")
@@ -375,6 +392,8 @@ violation_cols_to_drop += ["Lat_Long_Location", "Inspection_Month", "Inspection_
 violation_cols_to_drop += ["Street_Number", "Street_Name", "Street_Direction", "Street_Type", "Street_Unit"]
 
 df_dallas_silver = df_dallas_clean.drop(*violation_cols_to_drop)
+# Add lineage: updated_at + durability_key
+df_dallas_silver = add_silver_lineage(df_dallas_silver, ["Inspection_ID", "Restaurant_Name", "Inspection_Date"])
 
 (
     df_dallas_silver.write
@@ -388,12 +407,17 @@ print(f"Silver Dallas inspections: {df_dallas_silver.count()} rows")
 # COMMAND ----------
 
 # Silver - Dallas violations (one row per violation per inspection)
-(
+df_dallas_violations_out = (
     df_dallas_violations
     .select(
         "Inspection_ID", "violation_code", "violation_description",
         "violation_comments", "violation_points", "source_city"
     )
+)
+df_dallas_violations_out = add_silver_lineage(df_dallas_violations_out, ["Inspection_ID", "violation_code"])
+
+(
+    df_dallas_violations_out
     .write
     .format("delta")
     .mode("overwrite")

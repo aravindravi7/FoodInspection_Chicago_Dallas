@@ -19,10 +19,21 @@ from pyspark.sql.functions import (
     col, lit, when, coalesce, trim, upper, concat, concat_ws,
     monotonically_increasing_id, row_number, dense_rank,
     year, month, dayofmonth, dayofweek, quarter, date_format,
-    min as spark_min, max as spark_max, current_date
+    min as spark_min, max as spark_max, current_date, current_timestamp
 )
 from pyspark.sql.window import Window
 from pyspark.sql.types import IntegerType
+
+# COMMAND ----------
+
+def add_gold_lineage(df):
+    """Add Gold layer lineage columns: created_at, updated_at, etl_job_id."""
+    return (
+        df
+        .withColumn("created_at", current_timestamp())
+        .withColumn("updated_at", current_timestamp())
+        .withColumn("etl_job_id", lit(dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().toString()) if dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().isDefined() else lit("interactive"))
+    )
 
 # COMMAND ----------
 
@@ -86,6 +97,8 @@ df_dim_date = (
     .withColumn("day_name", date_format(col("full_date"), "EEEE"))
 )
 
+df_dim_date = add_gold_lineage(df_dim_date)
+
 (
     df_dim_date.write
     .format("delta")
@@ -140,6 +153,8 @@ df_dim_restaurant = (
     .withColumn("is_current", lit(True))
 )
 
+df_dim_restaurant = add_gold_lineage(df_dim_restaurant)
+
 (
     df_dim_restaurant.write
     .format("delta")
@@ -192,6 +207,8 @@ df_dim_location = (
     .withColumn("location_key", monotonically_increasing_id())
 )
 
+df_dim_location = add_gold_lineage(df_dim_location)
+
 (
     df_dim_location.write
     .format("delta")
@@ -220,6 +237,8 @@ df_dim_inspection_type = (
     .distinct()
     .withColumn("inspection_type_key", monotonically_increasing_id())
 )
+
+df_dim_inspection_type = add_gold_lineage(df_dim_inspection_type)
 
 (
     df_dim_inspection_type.write
@@ -267,6 +286,8 @@ df_dim_violation = (
     .distinct()
     .withColumn("violation_key", monotonically_increasing_id())
 )
+
+df_dim_violation = add_gold_lineage(df_dim_violation)
 
 (
     df_dim_violation.write
@@ -396,6 +417,8 @@ df_fact_inspection = (
     .withColumn("inspection_key", monotonically_increasing_id())
 )
 
+df_fact_inspection = add_gold_lineage(df_fact_inspection)
+
 (
     df_fact_inspection.write
     .format("delta")
@@ -467,6 +490,8 @@ df_dal_bridge = (
 
 # Union and write
 df_bridge = df_chi_bridge.unionByName(df_dal_bridge)
+
+df_bridge = add_gold_lineage(df_bridge)
 
 (
     df_bridge.write
