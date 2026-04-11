@@ -20,8 +20,8 @@ spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
-df_chicago = spark.table(f"hive_metastore.{DATABASE_NAME}.bronze_chicago_inspections")
-df_dallas = spark.table(f"hive_metastore.{DATABASE_NAME}.bronze_dallas_inspections")
+df_chicago = spark.table(f"{DATABASE_NAME}.bronze_chicago_inspections")
+df_dallas = spark.table(f"{DATABASE_NAME}.bronze_dallas_inspections")
 
 # COMMAND ----------
 
@@ -331,7 +331,9 @@ print("These rows will be flagged/dropped in Silver layer.")
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_chicago)
+# Read directly from CSV to avoid catalog resolution issues with summarize()
+df_chicago_raw = spark.read.option("header", "true").option("inferSchema", "true").csv(f"{VOLUME_PATH}/{CHICAGO_FILE}")
+dbutils.data.summarize(df_chicago_raw)
 
 # COMMAND ----------
 
@@ -340,7 +342,9 @@ dbutils.data.summarize(df_chicago)
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_dallas)
+# Read directly from CSV to avoid catalog resolution issues with summarize()
+df_dallas_raw = spark.read.option("header", "true").option("inferSchema", "true").csv(f"{VOLUME_PATH}/{DALLAS_FILE}")
+dbutils.data.summarize(df_dallas_raw)
 
 # COMMAND ----------
 
