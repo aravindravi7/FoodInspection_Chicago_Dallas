@@ -15,6 +15,18 @@ spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
+import re
+
+def sanitize_columns(df):
+    """Replace spaces and special characters in column names with underscores."""
+    for old_name in df.columns:
+        new_name = re.sub(r'[^a-zA-Z0-9_]', '_', old_name.strip()).strip('_')
+        new_name = re.sub(r'_+', '_', new_name)  # collapse multiple underscores
+        df = df.withColumnRenamed(old_name, new_name)
+    return df
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 1. Ingest Chicago Food Inspections
 
@@ -45,7 +57,13 @@ display(df_chicago_raw.limit(10))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Write Chicago Bronze Delta Table
+# MAGIC ### Sanitize Column Names & Write Chicago Bronze Delta Table
+
+# COMMAND ----------
+
+df_chicago_raw = sanitize_columns(df_chicago_raw)
+print("Chicago columns after sanitization:")
+print(df_chicago_raw.columns)
 
 # COMMAND ----------
 
@@ -91,7 +109,13 @@ display(df_dallas_raw.limit(10))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Write Dallas Bronze Delta Table
+# MAGIC ### Sanitize Column Names & Write Dallas Bronze Delta Table
+
+# COMMAND ----------
+
+df_dallas_raw = sanitize_columns(df_dallas_raw)
+print("Dallas columns after sanitization:")
+print(df_dallas_raw.columns)
 
 # COMMAND ----------
 

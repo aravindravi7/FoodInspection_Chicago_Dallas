@@ -51,13 +51,13 @@ print(f"Dallas violations:   {df_dal_viol.count()}")
 
 # Get date range from both datasets
 chi_dates = df_chi_insp.select(
-    spark_min("Inspection Date").alias("min_date"),
-    spark_max("Inspection Date").alias("max_date")
+    spark_min("Inspection_Date").alias("min_date"),
+    spark_max("Inspection_Date").alias("max_date")
 ).collect()[0]
 
 dal_dates = df_dal_insp.select(
-    spark_min("Inspection Date").alias("min_date"),
-    spark_max("Inspection Date").alias("max_date")
+    spark_min("Inspection_Date").alias("min_date"),
+    spark_max("Inspection_Date").alias("max_date")
 ).collect()[0]
 
 min_date = min(chi_dates["min_date"], dal_dates["min_date"])
@@ -108,10 +108,10 @@ display(df_dim_date.limit(10))
 # Chicago restaurants
 df_chi_restaurants = (
     df_chi_insp.select(
-        col("DBA Name").alias("restaurant_name"),
-        col("AKA Name").alias("aka_name"),
-        col("License #").cast("string").alias("license_number"),
-        col("Facility Type").alias("facility_type"),
+        col("DBA_Name").alias("restaurant_name"),
+        col("AKA_Name").alias("aka_name"),
+        col("License_").cast("string").alias("license_number"),
+        col("Facility_Type").alias("facility_type"),
         col("Risk").alias("risk_category"),
         col("source_city")
     ).distinct()
@@ -120,7 +120,7 @@ df_chi_restaurants = (
 # Dallas restaurants
 df_dal_restaurants = (
     df_dal_insp.select(
-        col("Restaurant Name").alias("restaurant_name"),
+        col("Restaurant_Name").alias("restaurant_name"),
         lit(None).cast("string").alias("aka_name"),
         lit(None).cast("string").alias("license_number"),
         lit(None).cast("string").alias("facility_type"),
@@ -175,10 +175,10 @@ df_chi_locations = (
 # Dallas locations
 df_dal_locations = (
     df_dal_insp.select(
-        col("Street Address").alias("address"),
+        col("Street_Address").alias("address"),
         col("City").alias("city"),
         col("State").alias("state"),
-        col("Zip Code").alias("zip"),
+        col("Zip_Code").alias("zip"),
         col("Latitude").cast("double").alias("latitude"),
         col("Longitude").cast("double").alias("longitude"),
         col("source_city")
@@ -212,8 +212,8 @@ display(df_dim_location.limit(10))
 # COMMAND ----------
 
 # Distinct inspection types from both cities
-df_chi_types = df_chi_insp.select(col("Inspection Type").alias("inspection_type_name"), col("source_city")).distinct()
-df_dal_types = df_dal_insp.select(col("Inspection Type").alias("inspection_type_name"), col("source_city")).distinct()
+df_chi_types = df_chi_insp.select(col("Inspection_Type").alias("inspection_type_name"), col("source_city")).distinct()
+df_dal_types = df_dal_insp.select(col("Inspection_Type").alias("inspection_type_name"), col("source_city")).distinct()
 
 df_dim_inspection_type = (
     df_chi_types.unionByName(df_dal_types)
@@ -304,8 +304,8 @@ df_chi_fact = (
     df_chi_insp
     .join(
         dim_restaurant.filter(col("is_current") == True).select("restaurant_key", "restaurant_name", "license_number", "source_city"),
-        (df_chi_insp["DBA Name"] == dim_restaurant["restaurant_name"]) &
-        (df_chi_insp["License #"].cast("string") == dim_restaurant["license_number"]) &
+        (df_chi_insp["DBA_Name"] == dim_restaurant["restaurant_name"]) &
+        (df_chi_insp["License_"].cast("string") == dim_restaurant["license_number"]) &
         (df_chi_insp["source_city"] == dim_restaurant["source_city"]),
         "left"
     )
@@ -318,23 +318,23 @@ df_chi_fact = (
     )
     .join(
         dim_inspection_type,
-        (df_chi_insp["Inspection Type"] == dim_inspection_type["inspection_type_name"]) &
+        (df_chi_insp["Inspection_Type"] == dim_inspection_type["inspection_type_name"]) &
         (df_chi_insp["source_city"] == dim_inspection_type["source_city"]),
         "left"
     )
     .join(
         dim_date,
-        df_chi_insp["Inspection Date"] == dim_date["full_date"],
+        df_chi_insp["Inspection_Date"] == dim_date["full_date"],
         "left"
     )
     .select(
-        df_chi_insp["Inspection ID"].alias("inspection_id"),
+        df_chi_insp["Inspection_ID"].alias("inspection_id"),
         col("restaurant_key"),
         col("location_key"),
         col("inspection_type_key"),
         col("date_key"),
         df_chi_insp["Results"].alias("inspection_result"),
-        df_chi_insp["Inspection Score"].alias("inspection_score"),
+        df_chi_insp["Inspection_Score"].alias("inspection_score"),
         df_chi_insp["source_city"]
     )
 )
@@ -350,36 +350,36 @@ df_dal_fact = (
     df_dal_insp
     .join(
         dim_restaurant.filter(col("is_current") == True).select("restaurant_key", "restaurant_name", "source_city"),
-        (df_dal_insp["Restaurant Name"] == dim_restaurant["restaurant_name"]) &
+        (df_dal_insp["Restaurant_Name"] == dim_restaurant["restaurant_name"]) &
         (df_dal_insp["source_city"] == dim_restaurant["source_city"]),
         "left"
     )
     .join(
         dim_location,
-        (df_dal_insp["Street Address"] == dim_location["address"]) &
-        (df_dal_insp["Zip Code"] == dim_location["zip"]) &
+        (df_dal_insp["Street_Address"] == dim_location["address"]) &
+        (df_dal_insp["Zip_Code"] == dim_location["zip"]) &
         (df_dal_insp["source_city"] == dim_location["source_city"]),
         "left"
     )
     .join(
         dim_inspection_type,
-        (df_dal_insp["Inspection Type"] == dim_inspection_type["inspection_type_name"]) &
+        (df_dal_insp["Inspection_Type"] == dim_inspection_type["inspection_type_name"]) &
         (df_dal_insp["source_city"] == dim_inspection_type["source_city"]),
         "left"
     )
     .join(
         dim_date,
-        df_dal_insp["Inspection Date"] == dim_date["full_date"],
+        df_dal_insp["Inspection_Date"] == dim_date["full_date"],
         "left"
     )
     .select(
-        df_dal_insp["Inspection ID"].alias("inspection_id"),
+        df_dal_insp["Inspection_ID"].alias("inspection_id"),
         col("restaurant_key"),
         col("location_key"),
         col("inspection_type_key"),
         col("date_key"),
         lit(None).cast("string").alias("inspection_result"),  # Dallas doesn't have result text
-        df_dal_insp["Inspection Score"].alias("inspection_score"),
+        df_dal_insp["Inspection_Score"].alias("inspection_score"),
         df_dal_insp["source_city"]
     )
 )
@@ -426,7 +426,7 @@ df_chi_bridge = (
     df_chi_viol
     .join(
         fact_inspection.select("inspection_key", "inspection_id", "source_city"),
-        (df_chi_viol["Inspection ID"] == fact_inspection["inspection_id"]) &
+        (df_chi_viol["Inspection_ID"] == fact_inspection["inspection_id"]) &
         (df_chi_viol["source_city"] == fact_inspection["source_city"]),
         "inner"
     )
@@ -448,7 +448,7 @@ df_dal_bridge = (
     df_dal_viol
     .join(
         fact_inspection.select("inspection_key", "inspection_id", "source_city"),
-        (df_dal_viol["Inspection ID"] == fact_inspection["inspection_id"]) &
+        (df_dal_viol["Inspection_ID"] == fact_inspection["inspection_id"]) &
         (df_dal_viol["source_city"] == fact_inspection["source_city"]),
         "inner"
     )

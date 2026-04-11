@@ -53,20 +53,20 @@ print(f"Dallas Bronze count: {df_dallas_bronze.count()}")
 df_chicago_clean = (
     df_chicago_bronze
     # Trim whitespace from string columns
-    .withColumn("DBA Name", trim(col("DBA Name")))
-    .withColumn("AKA Name", trim(col("AKA Name")))
+    .withColumn("DBA_Name", trim(col("DBA_Name")))
+    .withColumn("AKA_Name", trim(col("AKA_Name")))
     .withColumn("Address", trim(col("Address")))
     .withColumn("City", trim(upper(col("City"))))
     .withColumn("State", trim(upper(col("State"))))
     .withColumn("Results", trim(col("Results")))
-    .withColumn("Inspection Type", trim(col("Inspection Type")))
-    .withColumn("Facility Type", trim(col("Facility Type")))
+    .withColumn("Inspection_Type", trim(col("Inspection_Type")))
+    .withColumn("Facility_Type", trim(col("Facility_Type")))
     .withColumn("Risk", trim(col("Risk")))
     # Cast Zip to string and pad to 5 digits
     .withColumn("Zip", regexp_replace(col("Zip").cast("string"), "\\.0$", ""))
     .withColumn("Zip", when(length(col("Zip")) == 4, concat_ws("", lit("0"), col("Zip"))).otherwise(col("Zip")))
     # Parse Inspection Date
-    .withColumn("Inspection Date", to_date(col("Inspection Date"), "MM/dd/yyyy"))
+    .withColumn("Inspection_Date", to_date(col("Inspection_Date"), "MM/dd/yyyy"))
     # Add source city
     .withColumn("source_city", lit("Chicago"))
 )
@@ -79,7 +79,7 @@ df_chicago_clean = (
 # COMMAND ----------
 
 df_chicago_clean = df_chicago_clean.withColumn(
-    "Inspection Score",
+    "Inspection_Score",
     when(col("Results") == "Pass", 90)
     .when(col("Results") == "Pass w/ Conditions", 80)
     .when(col("Results") == "Fail", 70)
@@ -97,13 +97,13 @@ df_chicago_clean = df_chicago_clean.withColumn(
 chicago_before = df_chicago_clean.count()
 
 # Rule 1: Restaurant Name cannot be null
-df_chicago_clean = df_chicago_clean.filter(col("DBA Name").isNotNull() & (col("DBA Name") != ""))
+df_chicago_clean = df_chicago_clean.filter(col("DBA_Name").isNotNull() & (col("DBA_Name") != ""))
 
 # Rule 2: Inspection Date cannot be null
-df_chicago_clean = df_chicago_clean.filter(col("Inspection Date").isNotNull())
+df_chicago_clean = df_chicago_clean.filter(col("Inspection_Date").isNotNull())
 
 # Rule 3: Inspection Type cannot be null
-df_chicago_clean = df_chicago_clean.filter(col("Inspection Type").isNotNull() & (col("Inspection Type") != ""))
+df_chicago_clean = df_chicago_clean.filter(col("Inspection_Type").isNotNull() & (col("Inspection_Type") != ""))
 
 # Rule 4: Zip codes cannot be null and must be valid format (5 digits)
 df_chicago_clean = df_chicago_clean.filter(
@@ -159,13 +159,13 @@ df_chicago_violations = (
 )
 
 # Deduplicate violations per inspection
-df_chicago_violations = df_chicago_violations.dropDuplicates(["Inspection ID", "violation_code"])
+df_chicago_violations = df_chicago_violations.dropDuplicates(["Inspection_ID", "violation_code"])
 
 # COMMAND ----------
 
 display(
     df_chicago_violations
-    .select("Inspection ID", "violation_code", "violation_description", "violation_comments")
+    .select("Inspection_ID", "violation_code", "violation_description", "violation_comments")
     .limit(20)
 )
 
@@ -194,7 +194,7 @@ print(f"Silver Chicago inspections: {df_chicago_silver.count()} rows")
 (
     df_chicago_violations
     .select(
-        "Inspection ID", "violation_code", "violation_description",
+        "Inspection_ID", "violation_code", "violation_description",
         "violation_comments", "violation_points", "source_city"
     )
     .write
@@ -220,29 +220,29 @@ print("Silver Chicago violations table created.")
 
 df_dallas_clean = (
     df_dallas_bronze
-    .withColumn("Restaurant Name", trim(col("Restaurant Name")))
-    .withColumn("Street Address", trim(col("Street Address")))
-    .withColumn("Inspection Type", trim(col("Inspection Type")))
+    .withColumn("Restaurant_Name", trim(col("Restaurant_Name")))
+    .withColumn("Street_Address", trim(col("Street_Address")))
+    .withColumn("Inspection_Type", trim(col("Inspection_Type")))
     # Standardize Zip to 5 digits
-    .withColumn("Zip Code", regexp_replace(col("Zip Code").cast("string"), "\\.0$", ""))
-    .withColumn("Zip Code", when(length(col("Zip Code")) == 4, concat_ws("", lit("0"), col("Zip Code"))).otherwise(col("Zip Code")))
+    .withColumn("Zip_Code", regexp_replace(col("Zip_Code").cast("string"), "\\.0$", ""))
+    .withColumn("Zip_Code", when(length(col("Zip_Code")) == 4, concat_ws("", lit("0"), col("Zip_Code"))).otherwise(col("Zip_Code")))
     # Parse Inspection Date
-    .withColumn("Inspection Date", to_date(col("Inspection Date"), "MM/dd/yyyy"))
+    .withColumn("Inspection_Date", to_date(col("Inspection_Date"), "MM/dd/yyyy"))
     # Cast score to integer
-    .withColumn("Inspection Score", col("Inspection Score").cast(IntegerType()))
+    .withColumn("Inspection_Score", col("Inspection_Score").cast(IntegerType()))
     # Parse Lat/Long from combined field
     .withColumn("Latitude",
-        regexp_extract(col("Lat Long Location"), r"\(([^,]+),", 1).cast(DoubleType())
+        regexp_extract(col("Lat_Long_Location"), r"\(([^,]+),", 1).cast(DoubleType())
     )
     .withColumn("Longitude",
-        regexp_extract(col("Lat Long Location"), r",\s*([^)]+)\)", 1).cast(DoubleType())
+        regexp_extract(col("Lat_Long_Location"), r",\s*([^)]+)\)", 1).cast(DoubleType())
     )
     # Add hardcoded city/state and source
     .withColumn("City", lit("DALLAS"))
     .withColumn("State", lit("TX"))
     .withColumn("source_city", lit("Dallas"))
     # Generate a unique inspection ID for Dallas (it doesn't have one)
-    .withColumn("Inspection ID", monotonically_increasing_id())
+    .withColumn("Inspection_ID", monotonically_increasing_id())
 )
 
 # COMMAND ----------
@@ -255,26 +255,26 @@ df_dallas_clean = (
 dallas_before = df_dallas_clean.count()
 
 # Rule 1: Restaurant Name cannot be null
-df_dallas_clean = df_dallas_clean.filter(col("Restaurant Name").isNotNull() & (col("Restaurant Name") != ""))
+df_dallas_clean = df_dallas_clean.filter(col("Restaurant_Name").isNotNull() & (col("Restaurant_Name") != ""))
 
 # Rule 2: Inspection Date cannot be null
-df_dallas_clean = df_dallas_clean.filter(col("Inspection Date").isNotNull())
+df_dallas_clean = df_dallas_clean.filter(col("Inspection_Date").isNotNull())
 
 # Rule 3: Inspection Type cannot be null
-df_dallas_clean = df_dallas_clean.filter(col("Inspection Type").isNotNull() & (col("Inspection Type") != ""))
+df_dallas_clean = df_dallas_clean.filter(col("Inspection_Type").isNotNull() & (col("Inspection_Type") != ""))
 
 # Rule 4: Zip codes cannot be null and must be valid (5 digits)
 df_dallas_clean = df_dallas_clean.filter(
-    col("Zip Code").isNotNull() & col("Zip Code").rlike("^\\d{5}$")
+    col("Zip_Code").isNotNull() & col("Zip_Code").rlike("^\\d{5}$")
 )
 
 # Rule 5: Violation score cannot be more than 100
 df_dallas_clean = df_dallas_clean.filter(
-    col("Inspection Score").isNull() | (col("Inspection Score") <= 100)
+    col("Inspection_Score").isNull() | (col("Inspection_Score") <= 100)
 )
 
 # Count violations per row for validation
-violation_desc_cols = [c for c in df_dallas_clean.columns if c.startswith("Violation Description")]
+violation_desc_cols = [c for c in df_dallas_clean.columns if c.startswith("Violation_Description")]
 df_dallas_clean = df_dallas_clean.withColumn(
     "violation_count",
     sum([when(col(c).isNotNull() & (col(c) != ""), lit(1)).otherwise(lit(0)) for c in violation_desc_cols])
@@ -285,7 +285,7 @@ df_dallas_clean = df_dallas_clean.filter(col("violation_count") >= 1)
 
 # Rule 7: If score >= 90, cannot have more than 3 violations
 df_dallas_clean = df_dallas_clean.filter(
-    ~((col("Inspection Score") >= 90) & (col("violation_count") > 3))
+    ~((col("Inspection_Score") >= 90) & (col("violation_count") > 3))
 )
 
 dallas_after = df_dallas_clean.count()
@@ -300,22 +300,23 @@ print(f"Dallas: {dallas_before} -> {dallas_after} rows ({dallas_before - dallas_
 # COMMAND ----------
 
 # Build arrays of structs for each violation slot (1-25)
+# Column names after sanitization: Violation_Description_1, Violation_Points_1, etc.
 violation_structs = []
 for i in range(1, 26):
-    desc_col = f"Violation Description - {i}"
-    pts_col = f"Violation Points - {i}"
-    detail_col = f"Violation Detail - {i}"
-    memo_col = f"Violation Memo - {i}"
+    desc_col = f"Violation_Description_{i}"
+    pts_col = f"Violation_Points_{i}"
+    detail_col = f"Violation_Detail_{i}"
+    memo_col = f"Violation_Memo_{i}"
 
     # Check if columns exist
     if desc_col in df_dallas_clean.columns:
         violation_structs.append(
             struct(
                 lit(str(i)).alias("violation_num"),
-                col(f"`{desc_col}`").alias("violation_description"),
-                col(f"`{pts_col}`").cast(IntegerType()).alias("violation_points"),
-                col(f"`{detail_col}`").alias("violation_detail"),
-                col(f"`{memo_col}`").alias("violation_comments")
+                col(desc_col).alias("violation_description"),
+                col(pts_col).cast(IntegerType()).alias("violation_points"),
+                col(detail_col).alias("violation_detail"),
+                col(memo_col).alias("violation_comments")
             )
         )
 
@@ -327,7 +328,7 @@ df_dallas_violations = (
     # Only keep non-null violations
     .filter(col("violation.violation_description").isNotNull() & (col("violation.violation_description") != ""))
     .select(
-        "Inspection ID",
+        "Inspection_ID",
         col("violation.violation_num").alias("violation_num"),
         col("violation.violation_description").alias("violation_description_raw"),
         col("violation.violation_points").alias("violation_points"),
@@ -349,13 +350,13 @@ df_dallas_violations = (
 )
 
 # Deduplicate violations per inspection
-df_dallas_violations = df_dallas_violations.dropDuplicates(["Inspection ID", "violation_code"])
+df_dallas_violations = df_dallas_violations.dropDuplicates(["Inspection_ID", "violation_code"])
 
 # COMMAND ----------
 
 display(
     df_dallas_violations
-    .select("Inspection ID", "violation_code", "violation_description", "violation_points", "violation_comments")
+    .select("Inspection_ID", "violation_code", "violation_description", "violation_points", "violation_comments")
     .limit(20)
 )
 
@@ -368,10 +369,10 @@ display(
 
 # Silver - Dallas inspections (one row per inspection)
 # Drop the wide violation columns
-violation_cols_to_drop = [c for c in df_dallas_clean.columns if c.startswith("Violation ")]
-violation_cols_to_drop += ["Lat Long Location", "Inspection Month", "Inspection Year", "violation_count"]
-# Also drop individual street components (we keep Street Address)
-violation_cols_to_drop += ["Street Number", "Street Name", "Street Direction", "Street Type", "Street Unit"]
+violation_cols_to_drop = [c for c in df_dallas_clean.columns if c.startswith("Violation_")]
+violation_cols_to_drop += ["Lat_Long_Location", "Inspection_Month", "Inspection_Year", "violation_count"]
+# Also drop individual street components (we keep Street_Address)
+violation_cols_to_drop += ["Street_Number", "Street_Name", "Street_Direction", "Street_Type", "Street_Unit"]
 
 df_dallas_silver = df_dallas_clean.drop(*violation_cols_to_drop)
 
@@ -390,7 +391,7 @@ print(f"Silver Dallas inspections: {df_dallas_silver.count()} rows")
 (
     df_dallas_violations
     .select(
-        "Inspection ID", "violation_code", "violation_description",
+        "Inspection_ID", "violation_code", "violation_description",
         "violation_comments", "violation_points", "source_city"
     )
     .write

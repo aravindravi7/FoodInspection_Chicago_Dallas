@@ -58,10 +58,10 @@ def apply_scd2_restaurant():
 
     staging_chi = (
         df_chi.select(
-            col("DBA Name").alias("restaurant_name"),
-            col("AKA Name").alias("aka_name"),
-            col("License #").cast("string").alias("license_number"),
-            col("Facility Type").alias("facility_type"),
+            col("DBA_Name").alias("restaurant_name"),
+            col("AKA_Name").alias("aka_name"),
+            col("License_").cast("string").alias("license_number"),
+            col("Facility_Type").alias("facility_type"),
             col("Risk").alias("risk_category"),
             col("source_city")
         ).distinct()
@@ -69,7 +69,7 @@ def apply_scd2_restaurant():
 
     staging_dal = (
         df_dal.select(
-            col("Restaurant Name").alias("restaurant_name"),
+            col("Restaurant_Name").alias("restaurant_name"),
             lit(None).cast("string").alias("aka_name"),
             lit(None).cast("string").alias("license_number"),
             lit(None).cast("string").alias("facility_type"),
@@ -110,7 +110,7 @@ def apply_scd2_restaurant():
 
     # Step 2: Insert new current rows for changed records + brand new records
     # Find records that are either new or were just expired
-    expired_or_new = spark.sql("""
+    expired_or_new = spark.sql(f"""
         SELECT s.*
         FROM staging_restaurant s
         LEFT JOIN {DATABASE_NAME}.dim_restaurant t
