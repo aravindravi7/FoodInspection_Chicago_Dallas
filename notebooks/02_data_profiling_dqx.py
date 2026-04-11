@@ -52,12 +52,19 @@ df_chicago.printSchema()
 # COMMAND ----------
 
 from pyspark.sql.functions import col, count, when, isnan, round as spark_round, countDistinct, min, max, avg
+from pyspark.sql.types import StringType
+
+def null_or_empty(c, dtype):
+    """Check for null, and also empty string if column is StringType."""
+    if isinstance(dtype, StringType):
+        return col(c).isNull() | (col(c) == "")
+    return col(c).isNull()
 
 # Null counts and percentages for Chicago
 chicago_total = df_chicago.count()
 
 null_analysis_chicago = df_chicago.select([
-    count(when(col(c).isNull() | (col(c) == ""), c)).alias(c)
+    count(when(null_or_empty(c, df_chicago.schema[c].dataType), c)).alias(c)
     for c in df_chicago.columns
 ])
 
@@ -68,7 +75,7 @@ display(null_analysis_chicago)
 
 # Null percentage
 null_pct_chicago = df_chicago.select([
-    spark_round((count(when(col(c).isNull() | (col(c) == ""), c)) / chicago_total * 100), 2).alias(c)
+    spark_round((count(when(null_or_empty(c, df_chicago.schema[c].dataType), c)) / chicago_total * 100), 2).alias(c)
     for c in df_chicago.columns
 ])
 
@@ -201,7 +208,7 @@ df_dallas.printSchema()
 dallas_total = df_dallas.count()
 
 null_analysis_dallas = df_dallas.select([
-    count(when(col(c).isNull() | (col(c) == ""), c)).alias(c)
+    count(when(null_or_empty(c, df_dallas.schema[c].dataType), c)).alias(c)
     for c in df_dallas.columns
 ])
 
