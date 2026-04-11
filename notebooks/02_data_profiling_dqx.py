@@ -353,22 +353,16 @@ dbutils.data.summarize(df_dallas_raw)
 
 # COMMAND ----------
 
-# Try different DQX import paths (API changed across versions)
-try:
-    from databricks.labs.dqx.profiler import DQProfiler
-    profiler = DQProfiler(spark)
-    dqx_profile = lambda df: profiler.profile(df)
-    print("Using DQProfiler class")
-except ImportError:
-    try:
-        from databricks.labs.dqx.profiler import profile as dqx_profile_fn
-        dqx_profile = lambda df: dqx_profile_fn(df)
-        print("Using profile function")
-    except ImportError:
-        from databricks.labs.dqx import profiler as dqx_profiler
-        # List available attributes to find the right API
-        print("Available in dqx.profiler:", dir(dqx_profiler))
-        dqx_profile = None
+# Discover DQX package structure
+import databricks.labs.dqx as dqx
+print("DQX top-level:", dir(dqx))
+
+import pkgutil
+print("\nDQX submodules:")
+for importer, modname, ispkg in pkgutil.walk_packages(dqx.__path__, prefix="databricks.labs.dqx."):
+    print(f"  {modname} {'(package)' if ispkg else ''}")
+
+dqx_profile = None
 
 # COMMAND ----------
 
