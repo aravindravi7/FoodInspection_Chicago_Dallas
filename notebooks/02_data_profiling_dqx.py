@@ -349,46 +349,69 @@ dbutils.data.summarize(df_dallas_raw)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. DQX Profiling
+# MAGIC ## 5. DQX Data Quality Checks
+# MAGIC Using Databricks Labs DQX to define and apply data quality rules as expectations.
 
 # COMMAND ----------
 
-# Discover DQX package structure
-import databricks.labs.dqx as dqx
-print("DQX top-level:", dir(dqx))
-
-import pkgutil
-print("\nDQX submodules:")
-for importer, modname, ispkg in pkgutil.walk_packages(dqx.__path__, prefix="databricks.labs.dqx."):
-    print(f"  {modname} {'(package)' if ispkg else ''}")
-
-dqx_profile = None
+from databricks.labs.dqx.check_funcs import *
+from databricks.labs.dqx.engine import DQEngine
+from databricks.labs.dqx.base import DQRule
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 5.1 DQX Profile - Chicago
+# MAGIC ### 5.1 DQX Quality Checks - Chicago
 
 # COMMAND ----------
 
-if dqx_profile:
-    chicago_profile = dqx_profile(df_chicago)
-    display(chicago_profile)
-else:
-    print("DQX profiler not available - see available attributes above")
+# Define quality rules for Chicago
+chicago_checks = [
+    DQRule(name="chicago_inspection_id_not_null", criticality="error", check=is_not_null, col_name="Inspection_ID"),
+    DQRule(name="chicago_dba_name_not_null", criticality="error", check=is_not_null, col_name="DBA_Name"),
+    DQRule(name="chicago_inspection_date_not_null", criticality="error", check=is_not_null, col_name="Inspection_Date"),
+    DQRule(name="chicago_results_not_null", criticality="error", check=is_not_null, col_name="Results"),
+    DQRule(name="chicago_inspection_type_not_null", criticality="warn", check=is_not_null, col_name="Inspection_Type"),
+    DQRule(name="chicago_zip_not_null", criticality="warn", check=is_not_null, col_name="Zip"),
+    DQRule(name="chicago_city_not_null", criticality="warn", check=is_not_null, col_name="City"),
+    DQRule(name="chicago_license_not_null", criticality="warn", check=is_not_null, col_name="License"),
+]
+
+dq_engine = DQEngine(spark)
+chicago_valid, chicago_quarantine = dq_engine.apply_checks(df_chicago, chicago_checks)
+
+print(f"Chicago - Valid rows: {chicago_valid.count()}, Quarantined rows: {chicago_quarantine.count()}")
+
+# COMMAND ----------
+
+print("=== Chicago Quarantined Rows Sample ===")
+display(chicago_quarantine.limit(20))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 5.2 DQX Profile - Dallas
+# MAGIC ### 5.2 DQX Quality Checks - Dallas
 
 # COMMAND ----------
 
-if dqx_profile:
-    dallas_profile = dqx_profile(df_dallas)
-    display(dallas_profile)
-else:
-    print("DQX profiler not available - see available attributes above")
+# Define quality rules for Dallas
+dallas_checks = [
+    DQRule(name="dallas_restaurant_name_not_null", criticality="error", check=is_not_null, col_name="Restaurant_Name"),
+    DQRule(name="dallas_inspection_date_not_null", criticality="error", check=is_not_null, col_name="Inspection_Date"),
+    DQRule(name="dallas_inspection_type_not_null", criticality="error", check=is_not_null, col_name="Inspection_Type"),
+    DQRule(name="dallas_zip_code_not_null", criticality="warn", check=is_not_null, col_name="Zip_Code"),
+    DQRule(name="dallas_inspection_score_not_null", criticality="warn", check=is_not_null, col_name="Inspection_Score"),
+    DQRule(name="dallas_street_address_not_null", criticality="warn", check=is_not_null, col_name="Street_Address"),
+]
+
+dallas_valid, dallas_quarantine = dq_engine.apply_checks(df_dallas, dallas_checks)
+
+print(f"Dallas - Valid rows: {dallas_valid.count()}, Quarantined rows: {dallas_quarantine.count()}")
+
+# COMMAND ----------
+
+print("=== Dallas Quarantined Rows Sample ===")
+display(dallas_quarantine.limit(20))
 
 # COMMAND ----------
 
