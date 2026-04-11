@@ -20,8 +20,8 @@ spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
-df_chicago = spark.table(f"{DATABASE_NAME}.bronze_chicago_inspections")
-df_dallas = spark.table(f"{DATABASE_NAME}.bronze_dallas_inspections")
+df_chicago = spark.table(f"hive_metastore.{DATABASE_NAME}.bronze_chicago_inspections")
+df_dallas = spark.table(f"hive_metastore.{DATABASE_NAME}.bronze_dallas_inspections")
 
 # COMMAND ----------
 
@@ -331,8 +331,7 @@ print("These rows will be flagged/dropped in Silver layer.")
 
 # COMMAND ----------
 
-df_chicago.createOrReplaceTempView("tmp_chicago_profiling")
-dbutils.data.summarize(spark.table("tmp_chicago_profiling"))
+dbutils.data.summarize(df_chicago)
 
 # COMMAND ----------
 
@@ -341,8 +340,7 @@ dbutils.data.summarize(spark.table("tmp_chicago_profiling"))
 
 # COMMAND ----------
 
-df_dallas.createOrReplaceTempView("tmp_dallas_profiling")
-dbutils.data.summarize(spark.table("tmp_dallas_profiling"))
+dbutils.data.summarize(df_dallas)
 
 # COMMAND ----------
 
