@@ -331,7 +331,8 @@ print("These rows will be flagged/dropped in Silver layer.")
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_chicago.select("*"))
+df_chicago.createOrReplaceTempView("tmp_chicago_profiling")
+dbutils.data.summarize(spark.table("tmp_chicago_profiling"))
 
 # COMMAND ----------
 
@@ -340,7 +341,8 @@ dbutils.data.summarize(df_chicago.select("*"))
 
 # COMMAND ----------
 
-dbutils.data.summarize(df_dallas.select("*"))
+df_dallas.createOrReplaceTempView("tmp_dallas_profiling")
+dbutils.data.summarize(spark.table("tmp_dallas_profiling"))
 
 # COMMAND ----------
 
