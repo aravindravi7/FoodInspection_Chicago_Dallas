@@ -1,0 +1,20 @@
+Rows308K,308K,,
+Columns17,17,,
+Each row is a Food Inspection,,,
+Row Identifier Inspection ID,Inspection ID,,
+Column Name,Description,API Field Name,Data Type
+Inspection ID,,inspection_id,Number
+DBA Name,Doing Business As,dba_name,Text
+AKA Name,Also Known As,aka_name,Text
+License #,,license_,Number
+Facility Type,,facility_type,Text
+Risk,,risk,Text
+Address,,address,Text
+City,,city,Text
+State,,state,Text
+Zip,,zip,Number
+Inspection Date,,inspection_date,Floating Timestamp
+Inspection Type,,inspection_type,Text
+Results,,results,Text
+Violations,,violations,Text
+Latitude,,latitude,Number

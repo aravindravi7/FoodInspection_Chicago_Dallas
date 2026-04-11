@@ -1,0 +1,9 @@
+# Large dataset files (stored in Databricks raw_data/)
+data_files/dataset/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc

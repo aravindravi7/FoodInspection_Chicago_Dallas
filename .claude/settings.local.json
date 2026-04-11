@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv bronze/01_bronze_ingestion.py .)",
+      "Bash(mv bronze/02_data_profiling_dqx.py .)",
+      "Bash(mv silver/03_silver_cleansing.py .)",
+      "Bash(mv gold/04_gold_dim_load.py .)",
+      "Bash(mv gold/05_gold_scd2.py .)"
+    ]
+  }
+}
