@@ -11,7 +11,7 @@
 
 # COMMAND ----------
 
-spark.sql("USE food_inspection")
+spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
@@ -20,8 +20,8 @@ spark.sql("USE food_inspection")
 
 # COMMAND ----------
 
-df_chicago = spark.table("food_inspection.bronze_chicago_inspections")
-df_dallas = spark.table("food_inspection.bronze_dallas_inspections")
+df_chicago = spark.table(f"{DATABASE_NAME}.bronze_chicago_inspections")
+df_dallas = spark.table(f"{DATABASE_NAME}.bronze_dallas_inspections")
 
 # COMMAND ----------
 

@@ -11,7 +11,7 @@
 
 # COMMAND ----------
 
-spark.sql("USE food_inspection")
+spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
@@ -31,8 +31,8 @@ from pyspark.sql.types import IntegerType, DoubleType, StringType
 
 # COMMAND ----------
 
-df_chicago_bronze = spark.table("food_inspection.bronze_chicago_inspections")
-df_dallas_bronze = spark.table("food_inspection.bronze_dallas_inspections")
+df_chicago_bronze = spark.table(f"{DATABASE_NAME}.bronze_chicago_inspections")
+df_dallas_bronze = spark.table(f"{DATABASE_NAME}.bronze_dallas_inspections")
 
 print(f"Chicago Bronze count: {df_chicago_bronze.count()}")
 print(f"Dallas Bronze count: {df_dallas_bronze.count()}")
@@ -184,7 +184,7 @@ df_chicago_silver = df_chicago_clean.drop("Violations")  # violations stored sep
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.silver_chicago_inspections")
+    .saveAsTable(f"{DATABASE_NAME}.silver_chicago_inspections")
 )
 print(f"Silver Chicago inspections: {df_chicago_silver.count()} rows")
 
@@ -201,7 +201,7 @@ print(f"Silver Chicago inspections: {df_chicago_silver.count()} rows")
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.silver_chicago_violations")
+    .saveAsTable(f"{DATABASE_NAME}.silver_chicago_violations")
 )
 print("Silver Chicago violations table created.")
 
@@ -380,7 +380,7 @@ df_dallas_silver = df_dallas_clean.drop(*violation_cols_to_drop)
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.silver_dallas_inspections")
+    .saveAsTable(f"{DATABASE_NAME}.silver_dallas_inspections")
 )
 print(f"Silver Dallas inspections: {df_dallas_silver.count()} rows")
 
@@ -397,7 +397,7 @@ print(f"Silver Dallas inspections: {df_dallas_silver.count()} rows")
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.silver_dallas_violations")
+    .saveAsTable(f"{DATABASE_NAME}.silver_dallas_violations")
 )
 print("Silver Dallas violations table created.")
 
@@ -409,14 +409,15 @@ print("Silver Dallas violations table created.")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT 'Chicago Inspections' AS table_name, COUNT(*) AS row_count FROM food_inspection.silver_chicago_inspections
-# MAGIC UNION ALL
-# MAGIC SELECT 'Chicago Violations', COUNT(*) FROM food_inspection.silver_chicago_violations
-# MAGIC UNION ALL
-# MAGIC SELECT 'Dallas Inspections', COUNT(*) FROM food_inspection.silver_dallas_inspections
-# MAGIC UNION ALL
-# MAGIC SELECT 'Dallas Violations', COUNT(*) FROM food_inspection.silver_dallas_violations;
+display(spark.sql(f"""
+    SELECT 'Chicago Inspections' AS table_name, COUNT(*) AS row_count FROM {DATABASE_NAME}.silver_chicago_inspections
+    UNION ALL
+    SELECT 'Chicago Violations', COUNT(*) FROM {DATABASE_NAME}.silver_chicago_violations
+    UNION ALL
+    SELECT 'Dallas Inspections', COUNT(*) FROM {DATABASE_NAME}.silver_dallas_inspections
+    UNION ALL
+    SELECT 'Dallas Violations', COUNT(*) FROM {DATABASE_NAME}.silver_dallas_violations
+"""))
 
 # COMMAND ----------
 

@@ -11,7 +11,7 @@
 
 # COMMAND ----------
 
-spark.sql("USE food_inspection")
+spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
@@ -31,10 +31,10 @@ from pyspark.sql.types import IntegerType
 
 # COMMAND ----------
 
-df_chi_insp = spark.table("food_inspection.silver_chicago_inspections")
-df_dal_insp = spark.table("food_inspection.silver_dallas_inspections")
-df_chi_viol = spark.table("food_inspection.silver_chicago_violations")
-df_dal_viol = spark.table("food_inspection.silver_dallas_violations")
+df_chi_insp = spark.table(f"{DATABASE_NAME}.silver_chicago_inspections")
+df_dal_insp = spark.table(f"{DATABASE_NAME}.silver_dallas_inspections")
+df_chi_viol = spark.table(f"{DATABASE_NAME}.silver_chicago_violations")
+df_dal_viol = spark.table(f"{DATABASE_NAME}.silver_dallas_violations")
 
 print(f"Chicago inspections: {df_chi_insp.count()}")
 print(f"Dallas inspections:  {df_dal_insp.count()}")
@@ -91,7 +91,7 @@ df_dim_date = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.dim_date")
+    .saveAsTable(f"{DATABASE_NAME}.dim_date")
 )
 
 print(f"dim_date: {df_dim_date.count()} rows")
@@ -145,7 +145,7 @@ df_dim_restaurant = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.dim_restaurant")
+    .saveAsTable(f"{DATABASE_NAME}.dim_restaurant")
 )
 
 print(f"dim_restaurant: {df_dim_restaurant.count()} rows")
@@ -197,7 +197,7 @@ df_dim_location = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.dim_location")
+    .saveAsTable(f"{DATABASE_NAME}.dim_location")
 )
 
 print(f"dim_location: {df_dim_location.count()} rows")
@@ -226,7 +226,7 @@ df_dim_inspection_type = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.dim_inspection_type")
+    .saveAsTable(f"{DATABASE_NAME}.dim_inspection_type")
 )
 
 print(f"dim_inspection_type: {df_dim_inspection_type.count()} rows")
@@ -273,7 +273,7 @@ df_dim_violation = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.dim_violation")
+    .saveAsTable(f"{DATABASE_NAME}.dim_violation")
 )
 
 print(f"dim_violation: {df_dim_violation.count()} rows")
@@ -288,10 +288,10 @@ display(df_dim_violation.limit(20))
 # COMMAND ----------
 
 # Reload dims to get surrogate keys
-dim_restaurant = spark.table("food_inspection.dim_restaurant")
-dim_location = spark.table("food_inspection.dim_location")
-dim_inspection_type = spark.table("food_inspection.dim_inspection_type")
-dim_date = spark.table("food_inspection.dim_date")
+dim_restaurant = spark.table(f"{DATABASE_NAME}.dim_restaurant")
+dim_location = spark.table(f"{DATABASE_NAME}.dim_location")
+dim_inspection_type = spark.table(f"{DATABASE_NAME}.dim_inspection_type")
+dim_date = spark.table(f"{DATABASE_NAME}.dim_date")
 
 # COMMAND ----------
 
@@ -401,7 +401,7 @@ df_fact_inspection = (
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.fact_inspection")
+    .saveAsTable(f"{DATABASE_NAME}.fact_inspection")
 )
 
 print(f"fact_inspection: {df_fact_inspection.count()} rows")
@@ -416,8 +416,8 @@ display(df_fact_inspection.limit(10))
 # COMMAND ----------
 
 # Reload fact and violation dim
-fact_inspection = spark.table("food_inspection.fact_inspection")
-dim_violation = spark.table("food_inspection.dim_violation")
+fact_inspection = spark.table(f"{DATABASE_NAME}.fact_inspection")
+dim_violation = spark.table(f"{DATABASE_NAME}.dim_violation")
 
 # COMMAND ----------
 
@@ -473,7 +473,7 @@ df_bridge = df_chi_bridge.unionByName(df_dal_bridge)
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.bridge_inspection_violation")
+    .saveAsTable(f"{DATABASE_NAME}.bridge_inspection_violation")
 )
 
 print(f"bridge_inspection_violation: {df_bridge.count()} rows")
@@ -486,11 +486,12 @@ print(f"bridge_inspection_violation: {df_bridge.count()} rows")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT 'dim_date' AS table_name, COUNT(*) AS row_count FROM food_inspection.dim_date
-# MAGIC UNION ALL SELECT 'dim_restaurant', COUNT(*) FROM food_inspection.dim_restaurant
-# MAGIC UNION ALL SELECT 'dim_location', COUNT(*) FROM food_inspection.dim_location
-# MAGIC UNION ALL SELECT 'dim_inspection_type', COUNT(*) FROM food_inspection.dim_inspection_type
-# MAGIC UNION ALL SELECT 'dim_violation', COUNT(*) FROM food_inspection.dim_violation
-# MAGIC UNION ALL SELECT 'fact_inspection', COUNT(*) FROM food_inspection.fact_inspection
-# MAGIC UNION ALL SELECT 'bridge_inspection_violation', COUNT(*) FROM food_inspection.bridge_inspection_violation;
+display(spark.sql(f"""
+    SELECT 'dim_date' AS table_name, COUNT(*) AS row_count FROM {DATABASE_NAME}.dim_date
+    UNION ALL SELECT 'dim_restaurant', COUNT(*) FROM {DATABASE_NAME}.dim_restaurant
+    UNION ALL SELECT 'dim_location', COUNT(*) FROM {DATABASE_NAME}.dim_location
+    UNION ALL SELECT 'dim_inspection_type', COUNT(*) FROM {DATABASE_NAME}.dim_inspection_type
+    UNION ALL SELECT 'dim_violation', COUNT(*) FROM {DATABASE_NAME}.dim_violation
+    UNION ALL SELECT 'fact_inspection', COUNT(*) FROM {DATABASE_NAME}.fact_inspection
+    UNION ALL SELECT 'bridge_inspection_violation', COUNT(*) FROM {DATABASE_NAME}.bridge_inspection_violation
+"""))

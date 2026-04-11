@@ -13,7 +13,7 @@
 
 # COMMAND ----------
 
-spark.sql("USE food_inspection")
+spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
@@ -27,13 +27,11 @@ from delta.tables import DeltaTable
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT * FROM food_inspection.dim_restaurant LIMIT 10;
+display(spark.sql(f"SELECT * FROM {DATABASE_NAME}.dim_restaurant LIMIT 10"))
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT is_current, COUNT(*) FROM food_inspection.dim_restaurant GROUP BY is_current;
+display(spark.sql(f"SELECT is_current, COUNT(*) FROM {DATABASE_NAME}.dim_restaurant GROUP BY is_current"))
 
 # COMMAND ----------
 
@@ -51,12 +49,12 @@ def apply_scd2_restaurant():
     """
     Apply SCD Type 2 merge on dim_restaurant.
     Source: latest data from silver Chicago + Dallas inspections.
-    Target: food_inspection.dim_restaurant (Delta table).
+    Target: dim_restaurant (Delta table).
     """
 
     # Build staging data from silver tables (latest state of restaurants)
-    df_chi = spark.table("food_inspection.silver_chicago_inspections")
-    df_dal = spark.table("food_inspection.silver_dallas_inspections")
+    df_chi = spark.table(f"{DATABASE_NAME}.silver_chicago_inspections")
+    df_dal = spark.table(f"{DATABASE_NAME}.silver_dallas_inspections")
 
     staging_chi = (
         df_chi.select(
@@ -84,7 +82,7 @@ def apply_scd2_restaurant():
     staging.createOrReplaceTempView("staging_restaurant")
 
     # Get the Delta table reference
-    target = DeltaTable.forName(spark, "food_inspection.dim_restaurant")
+    target = DeltaTable.forName(spark, f"{DATABASE_NAME}.dim_restaurant")
 
     # Step 1: Expire changed rows (update end date and is_current flag)
     # We identify changes by comparing tracked attributes
@@ -115,7 +113,7 @@ def apply_scd2_restaurant():
     expired_or_new = spark.sql("""
         SELECT s.*
         FROM staging_restaurant s
-        LEFT JOIN food_inspection.dim_restaurant t
+        LEFT JOIN {DATABASE_NAME}.dim_restaurant t
         ON s.restaurant_name = t.restaurant_name
            AND s.source_city = t.source_city
            AND COALESCE(s.license_number, '') = COALESCE(t.license_number, '')
@@ -127,7 +125,7 @@ def apply_scd2_restaurant():
         # Generate new surrogate keys (starting after max existing key)
         from pyspark.sql.functions import monotonically_increasing_id
 
-        max_key = spark.sql("SELECT COALESCE(MAX(restaurant_key), 0) AS max_key FROM food_inspection.dim_restaurant").collect()[0]["max_key"]
+        max_key = spark.sql(f"SELECT COALESCE(MAX(restaurant_key), 0) AS max_key FROM {DATABASE_NAME}.dim_restaurant").collect()[0]["max_key"]
 
         new_rows = (
             expired_or_new
@@ -142,7 +140,7 @@ def apply_scd2_restaurant():
             new_rows.write
             .format("delta")
             .mode("append")
-            .saveAsTable("food_inspection.dim_restaurant")
+            .saveAsTable(f"{DATABASE_NAME}.dim_restaurant")
         )
 
         print(f"Step 2 complete: Inserted {new_rows.count()} new/updated rows.")
@@ -165,28 +163,28 @@ apply_scd2_restaurant()
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC -- Check current vs expired rows
-# MAGIC SELECT
-# MAGIC   is_current,
-# MAGIC   COUNT(*) AS row_count
-# MAGIC FROM food_inspection.dim_restaurant
-# MAGIC GROUP BY is_current;
+# Check current vs expired rows
+display(spark.sql(f"""
+    SELECT is_current, COUNT(*) AS row_count
+    FROM {DATABASE_NAME}.dim_restaurant
+    GROUP BY is_current
+"""))
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC -- Show any restaurants with history (both current and expired rows)
-# MAGIC SELECT *
-# MAGIC FROM food_inspection.dim_restaurant
-# MAGIC WHERE restaurant_name IN (
-# MAGIC   SELECT restaurant_name
-# MAGIC   FROM food_inspection.dim_restaurant
-# MAGIC   GROUP BY restaurant_name, source_city
-# MAGIC   HAVING COUNT(*) > 1
-# MAGIC )
-# MAGIC ORDER BY restaurant_name, effective_start_date
-# MAGIC LIMIT 20;
+# Show any restaurants with history (both current and expired rows)
+display(spark.sql(f"""
+    SELECT *
+    FROM {DATABASE_NAME}.dim_restaurant
+    WHERE restaurant_name IN (
+        SELECT restaurant_name
+        FROM {DATABASE_NAME}.dim_restaurant
+        GROUP BY restaurant_name, source_city
+        HAVING COUNT(*) > 1
+    )
+    ORDER BY restaurant_name, effective_start_date
+    LIMIT 20
+"""))
 
 # COMMAND ----------
 

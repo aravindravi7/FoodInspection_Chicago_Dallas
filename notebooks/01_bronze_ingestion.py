@@ -11,7 +11,7 @@
 
 # COMMAND ----------
 
-spark.sql("USE food_inspection")
+spark.sql(f"USE {DATABASE_NAME}")
 
 # COMMAND ----------
 
@@ -54,7 +54,7 @@ display(df_chicago_raw.limit(10))
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.bronze_chicago_inspections")
+    .saveAsTable(f"{DATABASE_NAME}.bronze_chicago_inspections")
 )
 
 print("Bronze table 'bronze_chicago_inspections' created successfully.")
@@ -100,7 +100,7 @@ display(df_dallas_raw.limit(10))
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", True)
-    .saveAsTable("food_inspection.bronze_dallas_inspections")
+    .saveAsTable(f"{DATABASE_NAME}.bronze_dallas_inspections")
 )
 
 print("Bronze table 'bronze_dallas_inspections' created successfully.")
@@ -112,12 +112,12 @@ print("Bronze table 'bronze_dallas_inspections' created successfully.")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SHOW TABLES IN food_inspection LIKE 'bronze_*';
+display(spark.sql(f"SHOW TABLES IN {DATABASE_NAME} LIKE 'bronze_*'"))
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT 'Chicago' AS source, COUNT(*) AS row_count FROM food_inspection.bronze_chicago_inspections
-# MAGIC UNION ALL
-# MAGIC SELECT 'Dallas' AS source, COUNT(*) AS row_count FROM food_inspection.bronze_dallas_inspections;
+display(spark.sql(f"""
+    SELECT 'Chicago' AS source, COUNT(*) AS row_count FROM {DATABASE_NAME}.bronze_chicago_inspections
+    UNION ALL
+    SELECT 'Dallas' AS source, COUNT(*) AS row_count FROM {DATABASE_NAME}.bronze_dallas_inspections
+"""))
