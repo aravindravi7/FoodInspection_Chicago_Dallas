@@ -354,9 +354,9 @@ dbutils.data.summarize(df_dallas_raw)
 
 # COMMAND ----------
 
-from databricks.labs.dqx.check_funcs import *
 from databricks.labs.dqx.engine import DQEngine
-from databricks.labs.dqx.base import DQRule
+
+dq_engine = DQEngine(spark)
 
 # COMMAND ----------
 
@@ -365,19 +365,18 @@ from databricks.labs.dqx.base import DQRule
 
 # COMMAND ----------
 
-# Define quality rules for Chicago
+# Define quality rules as dicts (DQX engine format)
 chicago_checks = [
-    DQRule(name="chicago_inspection_id_not_null", criticality="error", check=is_not_null, col_name="Inspection_ID"),
-    DQRule(name="chicago_dba_name_not_null", criticality="error", check=is_not_null, col_name="DBA_Name"),
-    DQRule(name="chicago_inspection_date_not_null", criticality="error", check=is_not_null, col_name="Inspection_Date"),
-    DQRule(name="chicago_results_not_null", criticality="error", check=is_not_null, col_name="Results"),
-    DQRule(name="chicago_inspection_type_not_null", criticality="warn", check=is_not_null, col_name="Inspection_Type"),
-    DQRule(name="chicago_zip_not_null", criticality="warn", check=is_not_null, col_name="Zip"),
-    DQRule(name="chicago_city_not_null", criticality="warn", check=is_not_null, col_name="City"),
-    DQRule(name="chicago_license_not_null", criticality="warn", check=is_not_null, col_name="License"),
+    {"name": "chicago_inspection_id_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_ID"}}},
+    {"name": "chicago_dba_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "DBA_Name"}}},
+    {"name": "chicago_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Date"}}},
+    {"name": "chicago_results_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Results"}}},
+    {"name": "chicago_inspection_type_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Type"}}},
+    {"name": "chicago_zip_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Zip"}}},
+    {"name": "chicago_city_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "City"}}},
+    {"name": "chicago_license_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "License"}}},
 ]
 
-dq_engine = DQEngine(spark)
 chicago_valid, chicago_quarantine = dq_engine.apply_checks(df_chicago, chicago_checks)
 
 print(f"Chicago - Valid rows: {chicago_valid.count()}, Quarantined rows: {chicago_quarantine.count()}")
@@ -396,12 +395,12 @@ display(chicago_quarantine.limit(20))
 
 # Define quality rules for Dallas
 dallas_checks = [
-    DQRule(name="dallas_restaurant_name_not_null", criticality="error", check=is_not_null, col_name="Restaurant_Name"),
-    DQRule(name="dallas_inspection_date_not_null", criticality="error", check=is_not_null, col_name="Inspection_Date"),
-    DQRule(name="dallas_inspection_type_not_null", criticality="error", check=is_not_null, col_name="Inspection_Type"),
-    DQRule(name="dallas_zip_code_not_null", criticality="warn", check=is_not_null, col_name="Zip_Code"),
-    DQRule(name="dallas_inspection_score_not_null", criticality="warn", check=is_not_null, col_name="Inspection_Score"),
-    DQRule(name="dallas_street_address_not_null", criticality="warn", check=is_not_null, col_name="Street_Address"),
+    {"name": "dallas_restaurant_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Restaurant_Name"}}},
+    {"name": "dallas_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Date"}}},
+    {"name": "dallas_inspection_type_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Type"}}},
+    {"name": "dallas_zip_code_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Zip_Code"}}},
+    {"name": "dallas_inspection_score_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Score"}}},
+    {"name": "dallas_street_address_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Street_Address"}}},
 ]
 
 dallas_valid, dallas_quarantine = dq_engine.apply_checks(df_dallas, dallas_checks)
