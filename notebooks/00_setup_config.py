@@ -29,22 +29,14 @@ print("Database 'food_inspection' is ready.")
 
 # COMMAND ----------
 
-# Raw data paths (update if your workspace path differs)
-BASE_PATH = "/Workspace/Users/ravi.ara@northeastern.edu/FoodInspection_FinalProject"
+# Raw data paths (Unity Catalog Volumes)
+VOLUME_PATH = "/Volumes/workspace/food_inspection/raw_data"
 
-RAW_CHICAGO_PATH = f"{BASE_PATH}/raw_data/chicago/"
-RAW_DALLAS_PATH = f"{BASE_PATH}/raw_data/dallas/"
-
-# Delta table storage paths
-BRONZE_PATH = f"{BASE_PATH}/bronze/delta/"
-SILVER_PATH = f"{BASE_PATH}/silver/delta/"
-GOLD_PATH = f"{BASE_PATH}/gold/delta/"
+RAW_CHICAGO_PATH = f"{VOLUME_PATH}/Food_Inspections_20260411.csv"
+RAW_DALLAS_PATH = f"{VOLUME_PATH}/Restaurant_and_Food_Establishment_Inspections_(October_2016_to_January_2024)_20260411.csv"
 
 print(f"Raw Chicago Path : {RAW_CHICAGO_PATH}")
 print(f"Raw Dallas Path  : {RAW_DALLAS_PATH}")
-print(f"Bronze Path      : {BRONZE_PATH}")
-print(f"Silver Path      : {SILVER_PATH}")
-print(f"Gold Path        : {GOLD_PATH}")
 
 # COMMAND ----------
 
@@ -54,25 +46,15 @@ print(f"Gold Path        : {GOLD_PATH}")
 # COMMAND ----------
 
 try:
-    chicago_files = dbutils.fs.ls(RAW_CHICAGO_PATH)
-    print("Chicago raw data files:")
-    for f in chicago_files:
+    files = dbutils.fs.ls(VOLUME_PATH)
+    print("Raw data files in Volume:")
+    for f in files:
         print(f"  {f.name} ({f.size / 1024 / 1024:.2f} MB)")
 except Exception as e:
-    print(f"Chicago raw data not found at {RAW_CHICAGO_PATH}. Please upload the CSV.")
-
-print()
-
-try:
-    dallas_files = dbutils.fs.ls(RAW_DALLAS_PATH)
-    print("Dallas raw data files:")
-    for f in dallas_files:
-        print(f"  {f.name} ({f.size / 1024 / 1024:.2f} MB)")
-except Exception as e:
-    print(f"Dallas raw data not found at {RAW_DALLAS_PATH}. Please upload the CSV.")
+    print(f"Raw data not found at {VOLUME_PATH}. Please upload the CSVs.")
 
 # COMMAND ----------
 
-# All variables (BASE_PATH, RAW_CHICAGO_PATH, RAW_DALLAS_PATH, BRONZE_PATH, SILVER_PATH, GOLD_PATH)
+# All variables (VOLUME_PATH, RAW_CHICAGO_PATH, RAW_DALLAS_PATH)
 # are available as Python variables in any notebook that runs: %run ./00_setup_config
 print("Configuration ready. All path variables are available via %run.")

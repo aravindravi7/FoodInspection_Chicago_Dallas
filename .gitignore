@@ -4,6 +4,9 @@ data_files/dataset/
 # macOS
 .DS_Store
 
+# Claude Code
+.claude/
+
 # Python
 __pycache__/
 *.pyc

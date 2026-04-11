@@ -49,8 +49,6 @@ display(df_chicago_raw.limit(10))
 
 # COMMAND ----------
 
-# BRONZE_PATH is available from %run ./00_setup_config
-
 (
     df_chicago_raw.write
     .format("delta")
