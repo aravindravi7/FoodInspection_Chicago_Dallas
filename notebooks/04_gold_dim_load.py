@@ -26,13 +26,22 @@ from pyspark.sql.types import IntegerType
 
 # COMMAND ----------
 
+def get_etl_job_id():
+    """Get the current notebook path, or 'interactive' if unavailable."""
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        return "interactive"
+
+ETL_JOB_ID = get_etl_job_id()
+
 def add_gold_lineage(df):
     """Add Gold layer lineage columns: created_at, updated_at, etl_job_id."""
     return (
         df
         .withColumn("created_at", current_timestamp())
         .withColumn("updated_at", current_timestamp())
-        .withColumn("etl_job_id", lit(dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().toString()) if dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().isDefined() else lit("interactive"))
+        .withColumn("etl_job_id", lit(ETL_JOB_ID))
     )
 
 # COMMAND ----------

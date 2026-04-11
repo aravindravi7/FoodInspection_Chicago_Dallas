@@ -26,13 +26,22 @@ def sanitize_columns(df):
         df = df.withColumnRenamed(old_name, new_name)
     return df
 
+def get_etl_job_id():
+    """Get the current notebook run ID, or 'interactive' if running manually."""
+    try:
+        return dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        return "interactive"
+
+ETL_JOB_ID = get_etl_job_id()
+
 def add_bronze_lineage(df, source_name):
     """Add lineage/audit columns to Bronze layer DataFrame."""
     return (
         df
         .withColumn("data_source_name", lit(source_name))
         .withColumn("ingest_timestamp", current_timestamp())
-        .withColumn("etl_job_id", lit(dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().toString()) if dbutils.notebook.entry_point.getDbutils().notebook().getContext().currentRunId().isDefined() else lit("interactive"))
+        .withColumn("etl_job_id", lit(ETL_JOB_ID))
     )
 
 # COMMAND ----------
