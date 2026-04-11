@@ -368,14 +368,14 @@ dq_engine = DQEngine(WorkspaceClient())
 
 # Define quality rules as dicts (DQX engine format)
 chicago_checks = [
-    {"name": "chicago_inspection_id_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_ID"}}},
-    {"name": "chicago_dba_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "DBA_Name"}}},
-    {"name": "chicago_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Date"}}},
-    {"name": "chicago_results_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Results"}}},
-    {"name": "chicago_inspection_type_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Type"}}},
-    {"name": "chicago_zip_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Zip"}}},
-    {"name": "chicago_city_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "City"}}},
-    {"name": "chicago_license_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "License"}}},
+    {"name": "chicago_inspection_id_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_ID"}}},
+    {"name": "chicago_dba_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "DBA_Name"}}},
+    {"name": "chicago_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_Date"}}},
+    {"name": "chicago_results_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Results"}}},
+    {"name": "chicago_inspection_type_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_Type"}}},
+    {"name": "chicago_zip_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "Zip"}}},
+    {"name": "chicago_city_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "City"}}},
+    {"name": "chicago_license_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "License"}}},
 ]
 
 chicago_valid, chicago_quarantine = dq_engine.apply_checks_by_metadata_and_split(df_chicago, chicago_checks)
@@ -396,12 +396,12 @@ display(chicago_quarantine.limit(20))
 
 # Define quality rules for Dallas
 dallas_checks = [
-    {"name": "dallas_restaurant_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Restaurant_Name"}}},
-    {"name": "dallas_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Date"}}},
-    {"name": "dallas_inspection_type_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Type"}}},
-    {"name": "dallas_zip_code_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Zip_Code"}}},
-    {"name": "dallas_inspection_score_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Inspection_Score"}}},
-    {"name": "dallas_street_address_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"col_name": "Street_Address"}}},
+    {"name": "dallas_restaurant_name_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Restaurant_Name"}}},
+    {"name": "dallas_inspection_date_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_Date"}}},
+    {"name": "dallas_inspection_type_not_null", "criticality": "error", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_Type"}}},
+    {"name": "dallas_zip_code_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "Zip_Code"}}},
+    {"name": "dallas_inspection_score_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "Inspection_Score"}}},
+    {"name": "dallas_street_address_not_null", "criticality": "warn", "check": {"function": "is_not_null", "arguments": {"column": "Street_Address"}}},
 ]
 
 dallas_valid, dallas_quarantine = dq_engine.apply_checks_by_metadata_and_split(df_dallas, dallas_checks)
