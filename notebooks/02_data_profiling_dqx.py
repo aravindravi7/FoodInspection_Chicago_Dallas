@@ -353,9 +353,22 @@ dbutils.data.summarize(df_dallas_raw)
 
 # COMMAND ----------
 
-from databricks.labs.dqx.profiler import DQProfiler
-
-profiler = DQProfiler(spark)
+# Try different DQX import paths (API changed across versions)
+try:
+    from databricks.labs.dqx.profiler import DQProfiler
+    profiler = DQProfiler(spark)
+    dqx_profile = lambda df: profiler.profile(df)
+    print("Using DQProfiler class")
+except ImportError:
+    try:
+        from databricks.labs.dqx.profiler import profile as dqx_profile_fn
+        dqx_profile = lambda df: dqx_profile_fn(df)
+        print("Using profile function")
+    except ImportError:
+        from databricks.labs.dqx import profiler as dqx_profiler
+        # List available attributes to find the right API
+        print("Available in dqx.profiler:", dir(dqx_profiler))
+        dqx_profile = None
 
 # COMMAND ----------
 
@@ -364,8 +377,11 @@ profiler = DQProfiler(spark)
 
 # COMMAND ----------
 
-chicago_profile = profiler.profile(df_chicago)
-display(chicago_profile)
+if dqx_profile:
+    chicago_profile = dqx_profile(df_chicago)
+    display(chicago_profile)
+else:
+    print("DQX profiler not available - see available attributes above")
 
 # COMMAND ----------
 
@@ -374,8 +390,11 @@ display(chicago_profile)
 
 # COMMAND ----------
 
-dallas_profile = profiler.profile(df_dallas)
-display(dallas_profile)
+if dqx_profile:
+    dallas_profile = dqx_profile(df_dallas)
+    display(dallas_profile)
+else:
+    print("DQX profiler not available - see available attributes above")
 
 # COMMAND ----------
 
