@@ -188,12 +188,21 @@ print(f"Staging restaurants: {df_staging_restaurant.count()} (Chicago: {df_chi_r
 
 table_name = f"{DATABASE_NAME}.dim_restaurant"
 
-# Use try/except instead of tableExists (more reliable across catalog types)
+# Check if dim_restaurant exists as a Delta table
+table_exists = False
 try:
-    target = DeltaTable.forName(spark, table_name)
-    table_exists = True
-    print("dim_restaurant exists — applying SCD Type 2 merge...")
-except Exception:
+    if spark.catalog.tableExists(table_name):
+        # Verify it's actually a Delta table
+        table_format = spark.sql(f"DESCRIBE DETAIL {table_name}").select("format").collect()[0][0]
+        if table_format == "delta":
+            target = DeltaTable.forName(spark, table_name)
+            table_exists = True
+            print("dim_restaurant exists as Delta — applying SCD Type 2 merge...")
+        else:
+            print(f"dim_restaurant exists but is {table_format} format — dropping and recreating as Delta...")
+            spark.sql(f"DROP TABLE IF EXISTS {table_name}")
+except Exception as e:
+    print(f"Table check: {e} — will create fresh.")
     table_exists = False
 
 if table_exists:
