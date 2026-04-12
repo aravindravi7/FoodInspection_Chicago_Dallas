@@ -29,6 +29,22 @@ import os
 
 # MAGIC %md
 # MAGIC ---
+# MAGIC ## STEP 0: Reset dim_restaurant (Run ONCE before testing)
+# MAGIC
+# MAGIC Drop dim_restaurant and re-run the pipeline (01 → 03 → 04) to get a clean initial load.
+# MAGIC This ensures the SCD2 MERGE path works correctly on the next pipeline run.
+
+# COMMAND ----------
+
+# Uncomment and run this cell to reset dim_restaurant:
+# spark.sql(f"DROP TABLE IF EXISTS {DATABASE_NAME}.dim_restaurant")
+# print("dim_restaurant dropped. Now re-run the pipeline (01 → 03 → 04) via Jobs to recreate it.")
+# print("After the pipeline completes, continue to Step 1.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
 # MAGIC ## STEP 1: Capture BEFORE State
 # MAGIC Run these queries BEFORE modifying the raw file.
 
@@ -120,20 +136,24 @@ print(f"Raw CSV columns: {len(df_raw.columns)}")
 # Change facility_type from current value to "SCD2_TEST_BAKERY"
 from pyspark.sql.functions import when
 
+# IMPORTANT: License # is read as integer from CSV (inferSchema), but TEST_LICENSE_1 is a string
+# from dim_restaurant. Cast the column to string for reliable comparison.
 df_modified = df_raw.withColumn(
     "Facility Type",
     when(
-        (col("DBA Name") == TEST_REST_1) & (col("License #") == TEST_LICENSE_1),
+        (col("DBA Name") == TEST_REST_1) & (col("License #").cast("string") == TEST_LICENSE_1),
         lit("SCD2_TEST_BAKERY")
     ).otherwise(col("Facility Type"))
 )
 
 # Verify the change
 changed_count_1 = df_modified.filter(
-    (col("DBA Name") == TEST_REST_1) & (col("License #") == TEST_LICENSE_1)
+    (col("DBA Name") == TEST_REST_1) & (col("License #").cast("string") == TEST_LICENSE_1)
 ).select("Facility Type").distinct().collect()
 print(f"TEST 1: Changed '{TEST_REST_1}' (License: {TEST_LICENSE_1}) facility_type to 'SCD2_TEST_BAKERY'")
 print(f"  Verification: {changed_count_1}")
+assert len(changed_count_1) == 1 and changed_count_1[0]["Facility Type"] == "SCD2_TEST_BAKERY", \
+    f"ERROR: Facility Type was NOT changed! Got: {changed_count_1}. Check type mismatch on License #."
 
 # COMMAND ----------
 
@@ -145,23 +165,25 @@ print(f"  Verification: {changed_count_1}")
 df_modified = df_modified.withColumn(
     "Risk",
     when(
-        (col("DBA Name") == TEST_REST_2) & (col("License #") == TEST_LICENSE_2),
+        (col("DBA Name") == TEST_REST_2) & (col("License #").cast("string") == TEST_LICENSE_2),
         lit("Risk 3 (Low)")
     ).otherwise(col("Risk"))
 ).withColumn(
     "AKA Name",
     when(
-        (col("DBA Name") == TEST_REST_2) & (col("License #") == TEST_LICENSE_2),
+        (col("DBA Name") == TEST_REST_2) & (col("License #").cast("string") == TEST_LICENSE_2),
         lit("SCD2_TEST_AKA_NAME")
     ).otherwise(col("AKA Name"))
 )
 
 changed_count_2 = df_modified.filter(
-    (col("DBA Name") == TEST_REST_2) & (col("License #") == TEST_LICENSE_2)
+    (col("DBA Name") == TEST_REST_2) & (col("License #").cast("string") == TEST_LICENSE_2)
 ).select("Risk", "AKA Name").distinct().collect()
 print(f"TEST 2: Changed '{TEST_REST_2}' (License: {TEST_LICENSE_2})")
 print(f"  risk_category -> 'Risk 3 (Low)', aka_name -> 'SCD2_TEST_AKA_NAME'")
 print(f"  Verification: {changed_count_2}")
+assert len(changed_count_2) == 1 and changed_count_2[0]["Risk"] == "Risk 3 (Low)", \
+    f"ERROR: Risk was NOT changed! Got: {changed_count_2}. Check type mismatch on License #."
 
 # COMMAND ----------
 
