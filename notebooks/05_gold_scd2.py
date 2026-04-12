@@ -57,19 +57,27 @@ print(f"Total rows: {total} | Current: {current} | Expired (historical): {expire
 
 # COMMAND ----------
 
-display(spark.sql(f"""
+# Business key = restaurant_name + source_city + license_number
+# Restaurants with >1 row per business key have SCD2 history
+scd2_history = spark.sql(f"""
     SELECT restaurant_name, source_city, license_number,
            facility_type, risk_category, aka_name,
            effective_start_date, effective_end_date, is_current
     FROM {DATABASE_NAME}.dim_restaurant
-    WHERE restaurant_name IN (
-        SELECT restaurant_name
+    WHERE (restaurant_name, source_city, COALESCE(license_number, '')) IN (
+        SELECT restaurant_name, source_city, COALESCE(license_number, '')
         FROM {DATABASE_NAME}.dim_restaurant
-        GROUP BY restaurant_name, source_city
+        GROUP BY restaurant_name, source_city, COALESCE(license_number, '')
         HAVING COUNT(*) > 1
     )
-    ORDER BY restaurant_name, source_city, effective_start_date
-"""))
+    ORDER BY restaurant_name, source_city, license_number, effective_start_date
+""")
+
+if scd2_history.count() > 0:
+    print(f"Found {scd2_history.count()} rows with SCD2 history:")
+    display(scd2_history)
+else:
+    print("No SCD2 history yet — run the pipeline with changed raw data to trigger SCD2.")
 
 # COMMAND ----------
 
@@ -79,21 +87,25 @@ display(spark.sql(f"""
 
 # COMMAND ----------
 
-display(spark.sql(f"""
+scd2_detail = spark.sql(f"""
     WITH history AS (
         SELECT *,
-            ROW_NUMBER() OVER (PARTITION BY restaurant_name, source_city ORDER BY effective_start_date DESC) AS rn
+            ROW_NUMBER() OVER (
+                PARTITION BY restaurant_name, source_city, COALESCE(license_number, '')
+                ORDER BY effective_start_date DESC
+            ) AS rn
         FROM {DATABASE_NAME}.dim_restaurant
-        WHERE restaurant_name IN (
-            SELECT restaurant_name
+        WHERE (restaurant_name, source_city, COALESCE(license_number, '')) IN (
+            SELECT restaurant_name, source_city, COALESCE(license_number, '')
             FROM {DATABASE_NAME}.dim_restaurant
-            GROUP BY restaurant_name, source_city
+            GROUP BY restaurant_name, source_city, COALESCE(license_number, '')
             HAVING COUNT(*) > 1
         )
     )
     SELECT
         h_new.restaurant_name,
         h_new.source_city,
+        h_new.license_number,
         h_old.facility_type AS old_facility_type,
         h_new.facility_type AS new_facility_type,
         h_old.risk_category AS old_risk_category,
@@ -108,9 +120,15 @@ display(spark.sql(f"""
     JOIN history h_old
         ON h_new.restaurant_name = h_old.restaurant_name
         AND h_new.source_city = h_old.source_city
+        AND COALESCE(h_new.license_number, '') = COALESCE(h_old.license_number, '')
         AND h_new.rn = 1 AND h_old.rn = 2
     ORDER BY h_new.restaurant_name
-"""))
+""")
+
+if scd2_detail.count() > 0:
+    display(scd2_detail)
+else:
+    print("No SCD2 changes detected yet — will populate after pipeline re-run with changed data.")
 
 # COMMAND ----------
 
@@ -123,12 +141,12 @@ display(spark.sql(f"""
 
 # COMMAND ----------
 
-# Check 1: Every restaurant+city combo should have exactly 1 current row
+# Check 1: Every business key (restaurant_name + source_city + license_number) should have exactly 1 current row
 multi_current = spark.sql(f"""
-    SELECT restaurant_name, source_city, COUNT(*) AS current_count
+    SELECT restaurant_name, source_city, license_number, COUNT(*) AS current_count
     FROM {DATABASE_NAME}.dim_restaurant
     WHERE is_current = True
-    GROUP BY restaurant_name, source_city
+    GROUP BY restaurant_name, source_city, license_number
     HAVING COUNT(*) > 1
 """)
 
