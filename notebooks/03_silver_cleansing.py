@@ -293,9 +293,9 @@ df_dallas_clean = df_dallas_clean.filter(
     col("Zip_Code").isNotNull() & col("Zip_Code").rlike("^\\d{5}$")
 )
 
-# Rule 5: Violation score cannot be more than 100
+# Rule 5: Violation score must be between 0 and 100 (negative scores like -26 found in profiling are invalid)
 df_dallas_clean = df_dallas_clean.filter(
-    col("Inspection_Score").isNull() | (col("Inspection_Score") <= 100)
+    col("Inspection_Score").isNull() | ((col("Inspection_Score") >= 0) & (col("Inspection_Score") <= 100))
 )
 
 # Count violations per row for validation
@@ -478,10 +478,11 @@ display(spark.sql(f"""
 # MAGIC 4. Parsed Lat/Long from combined location field
 # MAGIC 5. Added City="DALLAS", State="TX"
 # MAGIC 6. Generated unique Inspection IDs
-# MAGIC 7. Dropped rows: null Restaurant Name, Inspection Date, Type, Zip
-# MAGIC 8. Dropped rows: Inspection Score > 100
-# MAGIC 9. Dropped rows: no violations
-# MAGIC 10. Dropped rows: score >= 90 with > 3 violations
-# MAGIC 11. Unpivoted 25 wide violation columns into individual rows
-# MAGIC 12. Extracted violation codes from description text
-# MAGIC 13. Deduplicated violations per inspection
+# MAGIC 7. Derived Inspection Result from Score (>=90=Pass, 80-89=Pass w/ Conditions, <80=Fail)
+# MAGIC 8. Dropped rows: null Restaurant Name, Inspection Date, Type, Zip
+# MAGIC 9. Dropped rows: Inspection Score < 0 or > 100 (profiling revealed negative scores e.g. -26, treated as invalid data entry)
+# MAGIC 10. Dropped rows: no violations
+# MAGIC 11. Dropped rows: score >= 90 with > 3 violations
+# MAGIC 12. Unpivoted 25 wide violation columns into individual rows
+# MAGIC 13. Extracted violation codes from description text
+# MAGIC 14. Deduplicated violations per inspection
