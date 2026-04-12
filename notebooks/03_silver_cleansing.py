@@ -243,20 +243,20 @@ df_dallas_clean = (
     .withColumn("Restaurant_Name", trim(col("Restaurant_Name")))
     .withColumn("Street_Address", trim(col("Street_Address")))
     .withColumn("Inspection_Type", trim(col("Inspection_Type")))
-    # Standardize Zip to 5 digits
+    # Standardize Zip to 5 digits (extract first 5 digits from ZIP+4 like '75228-3007' or '752435219')
     .withColumn("Zip_Code", regexp_replace(col("Zip_Code").cast("string"), "\\.0$", ""))
+    .withColumn("Zip_Code", regexp_extract(col("Zip_Code"), r"^(\d{5})", 1))
+    .withColumn("Zip_Code", when(col("Zip_Code") == "", lit(None)).otherwise(col("Zip_Code")))
     .withColumn("Zip_Code", when(length(col("Zip_Code")) == 4, concat_ws("", lit("0"), col("Zip_Code"))).otherwise(col("Zip_Code")))
     # Parse Inspection Date
     .withColumn("Inspection_Date", to_date(col("Inspection_Date"), "MM/dd/yyyy"))
-    # Cast score to integer
-    .withColumn("Inspection_Score", col("Inspection_Score").cast(IntegerType()))
-    # Parse Lat/Long from combined field
-    .withColumn("Latitude",
-        regexp_extract(col("Lat_Long_Location"), r"\(([^,]+),", 1).cast(DoubleType())
-    )
-    .withColumn("Longitude",
-        regexp_extract(col("Lat_Long_Location"), r",\s*([^)]+)\)", 1).cast(DoubleType())
-    )
+    # Cast score to integer (use try_cast for ANSI mode safety)
+    .withColumn("Inspection_Score", expr("try_cast(Inspection_Score as int)"))
+    # Parse Lat/Long from combined field, then try_cast for safety
+    .withColumn("Latitude", regexp_extract(col("Lat_Long_Location"), r"\(([^,]+),", 1))
+    .withColumn("Latitude", expr("try_cast(Latitude as double)"))
+    .withColumn("Longitude", regexp_extract(col("Lat_Long_Location"), r",\s*([^)]+)\)", 1))
+    .withColumn("Longitude", expr("try_cast(Longitude as double)"))
     # Add hardcoded city/state and source
     .withColumn("City", lit("DALLAS"))
     .withColumn("State", lit("TX"))
