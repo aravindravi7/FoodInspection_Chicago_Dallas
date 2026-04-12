@@ -62,9 +62,9 @@ print(f"Dallas Bronze count: {df_dallas_bronze.count()}")
 
 df_chicago_clean = (
     df_chicago_bronze
-    # Trim whitespace from string columns
-    .withColumn("DBA_Name", trim(col("DBA_Name")))
-    .withColumn("AKA_Name", trim(col("AKA_Name")))
+    # Trim whitespace and remove escaped/stray quotes from name columns
+    .withColumn("DBA_Name", trim(regexp_replace(col("DBA_Name"), '"', '')))
+    .withColumn("AKA_Name", trim(regexp_replace(col("AKA_Name"), '"', '')))
     .withColumn("Address", trim(col("Address")))
     .withColumn("City", trim(upper(col("City"))))
     .withColumn("State", trim(upper(col("State"))))
