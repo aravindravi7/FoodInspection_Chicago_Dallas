@@ -137,7 +137,8 @@ display(df_dim_date.limit(10))
 # COMMAND ----------
 
 # Chicago restaurants - deduplicate by business key, keep latest values
-w_chi = Window.partitionBy("DBA_Name", "source_city", "License").orderBy(col("Inspection_Date").desc())
+# Add Inspection_ID as tiebreaker for rows with same date
+w_chi = Window.partitionBy("DBA_Name", "source_city", "License").orderBy(col("Inspection_Date").desc(), col("Inspection_ID").desc())
 df_chi_restaurants = (
     df_chi_insp
     .withColumn("_rn", row_number().over(w_chi))
@@ -150,10 +151,11 @@ df_chi_restaurants = (
         col("Risk").alias("risk_category"),
         col("source_city")
     )
+    .dropDuplicates(["restaurant_name", "source_city", "license_number"])  # safety net
 )
 
 # Dallas restaurants - deduplicate by business key
-w_dal = Window.partitionBy("Restaurant_Name", "source_city").orderBy(col("Inspection_Date").desc())
+w_dal = Window.partitionBy("Restaurant_Name", "source_city").orderBy(col("Inspection_Date").desc(), col("Inspection_ID").desc())
 df_dal_restaurants = (
     df_dal_insp
     .withColumn("_rn", row_number().over(w_dal))
@@ -166,6 +168,7 @@ df_dal_restaurants = (
         lit(None).cast("string").alias("risk_category"),
         col("source_city")
     )
+    .dropDuplicates(["restaurant_name", "source_city", "license_number"])  # safety net
 )
 
 # Union staging data
@@ -185,10 +188,15 @@ print(f"Staging restaurants: {df_staging_restaurant.count()} (Chicago: {df_chi_r
 
 table_name = f"{DATABASE_NAME}.dim_restaurant"
 
-if spark.catalog.tableExists(table_name):
-    print("dim_restaurant exists — applying SCD Type 2 merge...")
-
+# Use try/except instead of tableExists (more reliable across catalog types)
+try:
     target = DeltaTable.forName(spark, table_name)
+    table_exists = True
+    print("dim_restaurant exists — applying SCD Type 2 merge...")
+except Exception:
+    table_exists = False
+
+if table_exists:
 
     # Step 1: Expire changed rows
     target.alias("t").merge(
