@@ -1,15 +1,16 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 05 - SCD Type 2 Validation Test
+# MAGIC # 05 - SCD Type 2 Validation
 # MAGIC
-# MAGIC This notebook validates the SCD Type 2 implementation on `dim_restaurant` by simulating a pipeline re-run with changed data.
+# MAGIC This notebook validates the SCD Type 2 implementation on `dim_restaurant`.
 # MAGIC
-# MAGIC **Test Plan:**
-# MAGIC 1. Show current state of dim_restaurant (all rows are `is_current = True`)
-# MAGIC 2. Pick a test restaurant and simulate a change in the Silver table
-# MAGIC 3. Re-run notebook 04 (Gold load) which includes the SCD2 merge
-# MAGIC 4. Verify: old row expired (`is_current = False`), new row inserted (`is_current = True`)
-# MAGIC 5. Revert the Silver table back to original
+# MAGIC **SCD2 merge logic lives in Notebook 04** (part of the regular Gold pipeline).
+# MAGIC
+# MAGIC **How to test:**
+# MAGIC 1. Run the pipeline (01 → 03 → 04) via Databricks Jobs — initial load
+# MAGIC 2. Modify source data (raw CSV in Volumes OR Bronze table)
+# MAGIC 3. Re-run the pipeline — SCD2 detects the change
+# MAGIC 4. Run this notebook to validate results
 # MAGIC
 # MAGIC **SCD2 Details:**
 # MAGIC - **Table**: `dim_restaurant`
@@ -26,14 +27,12 @@
 
 spark.sql(f"USE {DATABASE_NAME}")
 
-from pyspark.sql.functions import col, lit, current_date
-from delta.tables import DeltaTable
-
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Current State of dim_restaurant (Before Change)
-# MAGIC All rows should be `is_current = True` from the initial load.
+# MAGIC ## 1. Overall dim_restaurant State
+# MAGIC Shows count of current vs expired rows. After initial load, all rows are `is_current = True`.
+# MAGIC After a pipeline re-run with changed data, some rows will be `is_current = False` (expired).
 
 # COMMAND ----------
 
@@ -41,155 +40,157 @@ display(spark.sql(f"""
     SELECT is_current, COUNT(*) AS row_count
     FROM {DATABASE_NAME}.dim_restaurant
     GROUP BY is_current
-    ORDER BY is_current
+    ORDER BY is_current DESC
 """))
 
-total = spark.table(f"{DATABASE_NAME}.dim_restaurant").count()
-print(f"Total dim_restaurant rows: {total}")
+total = spark.sql(f"SELECT COUNT(*) AS cnt FROM {DATABASE_NAME}.dim_restaurant").collect()[0]["cnt"]
+current = spark.sql(f"SELECT COUNT(*) AS cnt FROM {DATABASE_NAME}.dim_restaurant WHERE is_current = True").collect()[0]["cnt"]
+expired = total - current
+print(f"Total rows: {total} | Current: {current} | Expired (historical): {expired}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Select a Test Restaurant
+# MAGIC ## 2. Restaurants with SCD2 History
+# MAGIC These are restaurants where a tracked attribute changed between pipeline runs.
+# MAGIC Each should have at least 2 rows: one expired (old values) and one current (new values).
 
 # COMMAND ----------
 
-test_restaurant = spark.sql(f"""
+display(spark.sql(f"""
+    SELECT restaurant_name, source_city, license_number,
+           facility_type, risk_category, aka_name,
+           effective_start_date, effective_end_date, is_current
+    FROM {DATABASE_NAME}.dim_restaurant
+    WHERE restaurant_name IN (
+        SELECT restaurant_name
+        FROM {DATABASE_NAME}.dim_restaurant
+        GROUP BY restaurant_name, source_city
+        HAVING COUNT(*) > 1
+    )
+    ORDER BY restaurant_name, source_city, effective_start_date
+"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. SCD2 Change Detail
+# MAGIC Shows what specifically changed for restaurants with history.
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    WITH history AS (
+        SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY restaurant_name, source_city ORDER BY effective_start_date DESC) AS rn
+        FROM {DATABASE_NAME}.dim_restaurant
+        WHERE restaurant_name IN (
+            SELECT restaurant_name
+            FROM {DATABASE_NAME}.dim_restaurant
+            GROUP BY restaurant_name, source_city
+            HAVING COUNT(*) > 1
+        )
+    )
+    SELECT
+        h_new.restaurant_name,
+        h_new.source_city,
+        h_old.facility_type AS old_facility_type,
+        h_new.facility_type AS new_facility_type,
+        h_old.risk_category AS old_risk_category,
+        h_new.risk_category AS new_risk_category,
+        h_old.aka_name AS old_aka_name,
+        h_new.aka_name AS new_aka_name,
+        h_old.effective_start_date AS old_start,
+        h_old.effective_end_date AS old_end,
+        h_new.effective_start_date AS new_start,
+        h_new.effective_end_date AS new_end
+    FROM history h_new
+    JOIN history h_old
+        ON h_new.restaurant_name = h_old.restaurant_name
+        AND h_new.source_city = h_old.source_city
+        AND h_new.rn = 1 AND h_old.rn = 2
+    ORDER BY h_new.restaurant_name
+"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 4. Validate SCD2 Integrity
+# MAGIC Checks:
+# MAGIC - Every restaurant has exactly 1 current row
+# MAGIC - Expired rows have a valid end date (not 9999-12-31)
+# MAGIC - Current rows have end date = 9999-12-31
+
+# COMMAND ----------
+
+# Check 1: Every restaurant+city combo should have exactly 1 current row
+multi_current = spark.sql(f"""
+    SELECT restaurant_name, source_city, COUNT(*) AS current_count
+    FROM {DATABASE_NAME}.dim_restaurant
+    WHERE is_current = True
+    GROUP BY restaurant_name, source_city
+    HAVING COUNT(*) > 1
+""")
+
+if multi_current.count() == 0:
+    print("✓ CHECK PASSED: Every restaurant has exactly 1 current row")
+else:
+    print(f"✗ CHECK FAILED: {multi_current.count()} restaurants have multiple current rows")
+    display(multi_current)
+
+# COMMAND ----------
+
+# Check 2: All expired rows should have end_date != 9999-12-31
+bad_expired = spark.sql(f"""
     SELECT * FROM {DATABASE_NAME}.dim_restaurant
-    WHERE is_current = True AND facility_type IS NOT NULL AND source_city = 'Chicago'
-    LIMIT 1
-""").collect()[0]
+    WHERE is_current = False AND effective_end_date = '9999-12-31'
+""")
 
-test_name = test_restaurant["restaurant_name"]
-test_city = test_restaurant["source_city"]
-test_license = test_restaurant["license_number"] or ""
-test_old_facility = test_restaurant["facility_type"]
-
-print(f"Test restaurant: {test_name}")
-print(f"Source city: {test_city}")
-print(f"License: {test_license}")
-print(f"Current facility_type: {test_old_facility}")
+if bad_expired.count() == 0:
+    print("✓ CHECK PASSED: All expired rows have a valid end date")
+else:
+    print(f"✗ CHECK FAILED: {bad_expired.count()} expired rows still have end_date = 9999-12-31")
 
 # COMMAND ----------
 
-# Show current state of this restaurant in dim_restaurant
-print(f"=== dim_restaurant rows for '{test_name}' BEFORE change ===")
-display(spark.sql(f"""
-    SELECT restaurant_name, facility_type, risk_category, aka_name,
-           effective_start_date, effective_end_date, is_current
-    FROM {DATABASE_NAME}.dim_restaurant
-    WHERE restaurant_name = '{test_name.replace("'", "''")}' AND source_city = '{test_city}'
-    ORDER BY effective_start_date
-"""))
+# Check 3: All current rows should have end_date = 9999-12-31
+bad_current = spark.sql(f"""
+    SELECT * FROM {DATABASE_NAME}.dim_restaurant
+    WHERE is_current = True AND effective_end_date != '9999-12-31'
+""")
+
+if bad_current.count() == 0:
+    print("✓ CHECK PASSED: All current rows have end_date = 9999-12-31")
+else:
+    print(f"✗ CHECK FAILED: {bad_current.count()} current rows have wrong end date")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Simulate a Change in Silver Table
-# MAGIC We update the `facility_type` for our test restaurant in the Silver table to simulate a real-world data change (e.g., a restaurant changed its type from "Restaurant" to "Bakery").
+# MAGIC ## 5. Delta Table History
+# MAGIC Shows the version history of the dim_restaurant Delta table — each MERGE operation creates a new version.
 
 # COMMAND ----------
 
-# Update Silver table to simulate change
-silver_table = DeltaTable.forName(spark, f"{DATABASE_NAME}.silver_chicago_inspections")
-silver_table.update(
-    condition=f"DBA_Name = '{test_name.replace(chr(39), chr(39)+chr(39))}'",
-    set={"Facility_Type": lit("CHANGED_FOR_SCD2_TEST")}
-)
-
-print(f"✓ Updated '{test_name}' facility_type from '{test_old_facility}' to 'CHANGED_FOR_SCD2_TEST' in Silver table")
-
-# Verify the change in Silver
-display(spark.sql(f"""
-    SELECT DBA_Name, Facility_Type, source_city
-    FROM {DATABASE_NAME}.silver_chicago_inspections
-    WHERE DBA_Name = '{test_name.replace("'", "''")}'
-    LIMIT 5
-"""))
+display(spark.sql(f"DESCRIBE HISTORY {DATABASE_NAME}.dim_restaurant"))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Re-run Gold Pipeline (Notebook 04)
-# MAGIC This triggers the SCD2 merge in notebook 04 which will:
-# MAGIC - Detect that `facility_type` changed for our test restaurant
-# MAGIC - Expire the old row (`is_current = False`, `effective_end_date = today`)
-# MAGIC - Insert a new row with the updated value (`is_current = True`)
-
-# COMMAND ----------
-
-# MAGIC %run ./04_gold_dim_load
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 5. Verify SCD2: Old Row Expired, New Row Inserted
-
-# COMMAND ----------
-
-# Show the test restaurant - should now have 2 rows: one expired, one current
-print(f"=== dim_restaurant rows for '{test_name}' AFTER change ===")
-display(spark.sql(f"""
-    SELECT restaurant_name, facility_type, risk_category, aka_name,
-           effective_start_date, effective_end_date, is_current
-    FROM {DATABASE_NAME}.dim_restaurant
-    WHERE restaurant_name = '{test_name.replace("'", "''")}' AND source_city = '{test_city}'
-    ORDER BY effective_start_date
-"""))
-
-# COMMAND ----------
-
-# Overall SCD2 state - should show both current and expired rows
-display(spark.sql(f"""
-    SELECT is_current, COUNT(*) AS row_count
-    FROM {DATABASE_NAME}.dim_restaurant
-    GROUP BY is_current
-    ORDER BY is_current
-"""))
-
-total_after = spark.table(f"{DATABASE_NAME}.dim_restaurant").count()
-print(f"Total dim_restaurant rows after SCD2: {total_after} (was {total})")
-print(f"New rows added (expired + new current): {total_after - total}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 6. Revert Silver Table Back to Original
-# MAGIC Restore the original `facility_type` to keep data clean.
-
-# COMMAND ----------
-
-silver_table.update(
-    condition=f"DBA_Name = '{test_name.replace(chr(39), chr(39)+chr(39))}'",
-    set={"Facility_Type": lit(test_old_facility)}
-)
-
-print(f"✓ Reverted '{test_name}' facility_type back to '{test_old_facility}' in Silver table")
-
-# Verify revert
-display(spark.sql(f"""
-    SELECT DBA_Name, Facility_Type, source_city
-    FROM {DATABASE_NAME}.silver_chicago_inspections
-    WHERE DBA_Name = '{test_name.replace("'", "''")}'
-    LIMIT 5
-"""))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 7. SCD2 Implementation Summary
+# MAGIC ## 6. SCD2 Implementation Documentation
 # MAGIC
-# MAGIC ### How It Works (in Notebook 04):
-# MAGIC 1. **Staging data** is built from Silver tables, deduplicated per business key (latest values via window function)
-# MAGIC 2. **First run**: If `dim_restaurant` doesn't exist, creates it with initial load (all `is_current = True`)
-# MAGIC 3. **Subsequent runs**: Delta MERGE compares staging vs current rows:
-# MAGIC    - If `facility_type`, `risk_category`, or `aka_name` changed → expire old row, insert new current row
-# MAGIC    - If brand new restaurant → insert as current row
-# MAGIC    - If unchanged → no action
+# MAGIC ### Architecture:
+# MAGIC - SCD2 merge logic is built into **Notebook 04** (Gold load pipeline)
+# MAGIC - On first run: `dim_restaurant` is created with initial load (all `is_current = True`)
+# MAGIC - On subsequent runs: Delta MERGE detects changes and applies SCD2
 # MAGIC
-# MAGIC ### Test Results:
-# MAGIC - **Before change**: Test restaurant had 1 row (`is_current = True`)
-# MAGIC - **After simulated change**: Test restaurant has 2 rows:
-# MAGIC   - Old row: `is_current = False`, `effective_end_date = today`
-# MAGIC   - New row: `is_current = True`, `effective_end_date = 9999-12-31`, `facility_type = CHANGED_FOR_SCD2_TEST`
-# MAGIC - This confirms SCD Type 2 is working correctly.
+# MAGIC ### How it works:
+# MAGIC 1. **Staging data** is built from Silver tables, deduplicated per business key using window functions (latest inspection values)
+# MAGIC 2. **MERGE Step 1**: Compare staging vs current dim rows — if tracked attributes changed, expire old row (`is_current = False`, `effective_end_date = today`)
+# MAGIC 3. **MERGE Step 2**: Insert new current row for changed/new restaurants (`is_current = True`, `effective_start_date = today`, `effective_end_date = 9999-12-31`)
+# MAGIC
+# MAGIC ### Testing Approach:
+# MAGIC - **Test via Raw CSV**: Modify the source CSV in Volumes → Run full pipeline (01 → 03 → 04) → SCD2 detects change
+# MAGIC - **Test via Bronze**: Modify Bronze Delta table directly → Run pipeline (03 → 04) → SCD2 detects change
+# MAGIC - **Validation**: Run this notebook (05) to verify expired/current rows and integrity checks
+# MAGIC - **Pipeline**: Set up in Databricks Jobs (01 → 03 → 04), validated via SQL Query Editor
