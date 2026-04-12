@@ -171,8 +171,9 @@ df_chicago_violations = (
     .withColumn("violation_points", lit(None).cast(IntegerType()))  # Chicago doesn't have points per violation
 )
 
-# Deduplicate violations per inspection
-df_chicago_violations = df_chicago_violations.dropDuplicates(["Inspection_ID", "violation_code"])
+# Deduplicate violations per inspection (use code + description as key to avoid
+# collapsing different violations when code extraction returns blank)
+df_chicago_violations = df_chicago_violations.dropDuplicates(["Inspection_ID", "violation_code", "violation_description"])
 
 # COMMAND ----------
 
@@ -377,8 +378,9 @@ df_dallas_violations = (
     )
 )
 
-# Deduplicate violations per inspection
-df_dallas_violations = df_dallas_violations.dropDuplicates(["Inspection_ID", "violation_code"])
+# Deduplicate violations per inspection (use code + description as key to avoid
+# collapsing different violations when code extraction returns blank)
+df_dallas_violations = df_dallas_violations.dropDuplicates(["Inspection_ID", "violation_code", "violation_description"])
 
 # COMMAND ----------
 
