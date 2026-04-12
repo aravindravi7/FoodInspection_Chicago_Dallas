@@ -217,6 +217,17 @@ display(null_analysis_dallas)
 
 # COMMAND ----------
 
+# Null percentage - Dallas
+null_pct_dallas = df_dallas.select([
+    spark_round((count(when(null_or_empty(c, df_dallas.schema[c].dataType), c)) / dallas_total * 100), 2).alias(c)
+    for c in df_dallas.columns
+])
+
+print("=== DALLAS: Null/Empty Percentage ===")
+display(null_pct_dallas)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ### 3.3 Key Column Distributions - Dallas
 
