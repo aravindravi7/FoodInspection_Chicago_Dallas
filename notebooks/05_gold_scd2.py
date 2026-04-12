@@ -189,7 +189,116 @@ display(spark.sql(f"""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. SCD2 Documentation
+# MAGIC ## 5. SCD2 Test - Simulate a Change
+# MAGIC
+# MAGIC To demonstrate SCD2 working, we simulate a restaurant changing its `facility_type`.
+# MAGIC This will expire the old row and insert a new current row.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.1 Pick a restaurant and show its current state
+
+# COMMAND ----------
+
+test_restaurant = spark.sql(f"""
+    SELECT * FROM {DATABASE_NAME}.dim_restaurant
+    WHERE is_current = True AND facility_type IS NOT NULL
+    LIMIT 1
+""").collect()[0]
+
+test_name = test_restaurant["restaurant_name"]
+test_city = test_restaurant["source_city"]
+test_license = test_restaurant["license_number"] or ""
+test_old_facility = test_restaurant["facility_type"]
+
+print(f"Test restaurant: {test_name} ({test_city})")
+print(f"Current facility_type: {test_old_facility}")
+
+# Show current state
+display(spark.sql(f"""
+    SELECT restaurant_name, facility_type, risk_category, aka_name,
+           effective_start_date, effective_end_date, is_current
+    FROM {DATABASE_NAME}.dim_restaurant
+    WHERE restaurant_name = '{test_name.replace("'", "''")}' AND source_city = '{test_city}'
+    ORDER BY effective_start_date
+"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.2 Simulate change: Update facility_type in Silver table
+
+# COMMAND ----------
+
+from delta.tables import DeltaTable as DT
+
+# Temporarily update the Silver table to simulate a data change
+silver_table = DT.forName(spark, f"{DATABASE_NAME}.silver_chicago_inspections")
+silver_table.update(
+    condition=f"DBA_Name = '{test_name.replace(chr(39), chr(39)+chr(39))}'",
+    set={"Facility_Type": lit("CHANGED_FOR_SCD2_TEST")}
+)
+
+print(f"Updated '{test_name}' facility_type to 'CHANGED_FOR_SCD2_TEST' in Silver table")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.3 Re-run SCD2 merge to detect the change
+
+# COMMAND ----------
+
+apply_scd2_restaurant()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.4 Verify: Old row expired, new row inserted
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    SELECT restaurant_name, facility_type, risk_category,
+           effective_start_date, effective_end_date, is_current
+    FROM {DATABASE_NAME}.dim_restaurant
+    WHERE restaurant_name = '{test_name.replace("'", "''")}' AND source_city = '{test_city}'
+    ORDER BY effective_start_date
+"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.5 Revert Silver table back to original
+
+# COMMAND ----------
+
+# Restore the original facility_type
+silver_table.update(
+    condition=f"DBA_Name = '{test_name.replace(chr(39), chr(39)+chr(39))}'",
+    set={"Facility_Type": lit(test_old_facility)}
+)
+
+print(f"Reverted '{test_name}' facility_type back to '{test_old_facility}' in Silver table")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 5.6 Final SCD2 state summary
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    SELECT is_current, COUNT(*) AS row_count
+    FROM {DATABASE_NAME}.dim_restaurant
+    GROUP BY is_current
+    ORDER BY is_current
+"""))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 6. SCD2 Documentation
 # MAGIC
 # MAGIC ### Implementation Details:
 # MAGIC - **Table**: `dim_restaurant`
