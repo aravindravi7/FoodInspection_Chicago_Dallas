@@ -408,7 +408,13 @@ df_dal_fact = (
         col("location_key"),
         col("inspection_type_key"),
         col("date_key"),
-        lit(None).cast("string").alias("inspection_result"),  # Dallas doesn't have result text
+        # Derive inspection result from score for Dallas
+        when(df_dal_insp["Inspection_Score"] >= 90, lit("Pass"))
+        .when(df_dal_insp["Inspection_Score"] >= 80, lit("Pass w/ Conditions"))
+        .when(df_dal_insp["Inspection_Score"] >= 70, lit("Fail"))
+        .when(df_dal_insp["Inspection_Score"] < 70, lit("Fail"))
+        .otherwise(lit(None).cast("string"))
+        .alias("inspection_result"),
         df_dal_insp["Inspection_Score"].alias("inspection_score"),
         df_dal_insp["source_city"]
     )
