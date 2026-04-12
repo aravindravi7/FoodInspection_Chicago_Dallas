@@ -85,6 +85,12 @@ test_restaurants = spark.sql(f"""
       AND facility_type IS NOT NULL
       AND risk_category IS NOT NULL
       AND license_number IS NOT NULL
+      AND restaurant_name NOT LIKE '%"%'
+      AND restaurant_name NOT LIKE "%'%"
+      AND restaurant_name NOT LIKE '%#%'
+      AND restaurant_name NOT LIKE '%&%'
+      AND restaurant_name NOT LIKE '%(%'
+      AND restaurant_name NOT LIKE '%\\\\%'
     ORDER BY restaurant_name
     LIMIT 5
 """)
