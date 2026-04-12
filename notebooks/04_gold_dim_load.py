@@ -251,7 +251,7 @@ if table_exists:
         print("Step 2: No new or changed records.")
 
 else:
-    print("dim_restaurant does not exist — creating initial load...")
+    print("dim_restaurant does not exist — creating initial load with APPEND mode...")
 
     df_dim_restaurant = (
         df_staging_restaurant
@@ -262,14 +262,32 @@ else:
     )
     df_dim_restaurant = add_gold_lineage(df_dim_restaurant)
 
+    # Create empty table first, then append (never overwrite SCD2 tables)
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            restaurant_name STRING,
+            aka_name STRING,
+            license_number STRING,
+            facility_type STRING,
+            risk_category STRING,
+            source_city STRING,
+            restaurant_key BIGINT,
+            effective_start_date DATE,
+            effective_end_date DATE,
+            is_current BOOLEAN,
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP,
+            etl_job_id STRING
+        ) USING DELTA
+    """)
+
     (
         df_dim_restaurant.write
         .format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", True)
+        .mode("append")
         .saveAsTable(table_name)
     )
-    print(f"Initial load: {df_dim_restaurant.count()} rows")
+    print(f"Initial load (append): {df_dim_restaurant.count()} rows")
 
 # COMMAND ----------
 
