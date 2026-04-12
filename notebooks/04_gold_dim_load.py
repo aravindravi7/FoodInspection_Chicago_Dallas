@@ -262,25 +262,8 @@ else:
     )
     df_dim_restaurant = add_gold_lineage(df_dim_restaurant)
 
-    # Create empty table first, then append (never overwrite SCD2 tables)
-    spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            restaurant_name STRING,
-            aka_name STRING,
-            license_number STRING,
-            facility_type STRING,
-            risk_category STRING,
-            source_city STRING,
-            restaurant_key BIGINT,
-            effective_start_date DATE,
-            effective_end_date DATE,
-            is_current BOOLEAN,
-            created_at TIMESTAMP,
-            updated_at TIMESTAMP,
-            etl_job_id STRING
-        ) USING DELTA
-    """)
-
+    # Use append mode — saveAsTable creates the Delta table if it doesn't exist
+    # Never use overwrite for SCD2 tables to preserve history on re-runs
     (
         df_dim_restaurant.write
         .format("delta")
