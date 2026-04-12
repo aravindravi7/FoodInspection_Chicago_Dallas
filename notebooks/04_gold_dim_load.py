@@ -23,6 +23,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 from pyspark.sql.types import IntegerType
+from delta.tables import DeltaTable
 
 # COMMAND ----------
 
@@ -127,53 +128,153 @@ display(df_dim_date.limit(10))
 
 # COMMAND ----------
 
-# Chicago restaurants
+# MAGIC %md
+# MAGIC ### 3.1 Build staging data (deduplicated per business key)
+# MAGIC Business key: `restaurant_name + source_city + license_number`
+# MAGIC
+# MAGIC Tracked SCD2 attributes: `facility_type`, `risk_category`, `aka_name`
+
+# COMMAND ----------
+
+# Chicago restaurants - deduplicate by business key, keep latest values
+w_chi = Window.partitionBy("DBA_Name", "source_city", "License").orderBy(col("Inspection_Date").desc())
 df_chi_restaurants = (
-    df_chi_insp.select(
+    df_chi_insp
+    .withColumn("_rn", row_number().over(w_chi))
+    .filter(col("_rn") == 1)
+    .select(
         col("DBA_Name").alias("restaurant_name"),
         col("AKA_Name").alias("aka_name"),
         col("License").cast("string").alias("license_number"),
         col("Facility_Type").alias("facility_type"),
         col("Risk").alias("risk_category"),
         col("source_city")
-    ).distinct()
+    )
 )
 
-# Dallas restaurants
+# Dallas restaurants - deduplicate by business key
+w_dal = Window.partitionBy("Restaurant_Name", "source_city").orderBy(col("Inspection_Date").desc())
 df_dal_restaurants = (
-    df_dal_insp.select(
+    df_dal_insp
+    .withColumn("_rn", row_number().over(w_dal))
+    .filter(col("_rn") == 1)
+    .select(
         col("Restaurant_Name").alias("restaurant_name"),
         lit(None).cast("string").alias("aka_name"),
         lit(None).cast("string").alias("license_number"),
         lit(None).cast("string").alias("facility_type"),
         lit(None).cast("string").alias("risk_category"),
         col("source_city")
-    ).distinct()
+    )
 )
 
-# Union and assign surrogate keys
-df_dim_restaurant = (
-    df_chi_restaurants.unionByName(df_dal_restaurants)
-    .distinct()
-    .withColumn("restaurant_key", monotonically_increasing_id())
-    # SCD2 columns
-    .withColumn("effective_start_date", current_date())
-    .withColumn("effective_end_date", lit("9999-12-31").cast("date"))
-    .withColumn("is_current", lit(True))
-)
+# Union staging data
+df_staging_restaurant = df_chi_restaurants.unionByName(df_dal_restaurants)
 
-df_dim_restaurant = add_gold_lineage(df_dim_restaurant)
+df_staging_restaurant.createOrReplaceTempView("staging_restaurant")
+print(f"Staging restaurants: {df_staging_restaurant.count()} (Chicago: {df_chi_restaurants.count()}, Dallas: {df_dal_restaurants.count()})")
 
-(
-    df_dim_restaurant.write
-    .format("delta")
-    .mode("overwrite")
-    .option("overwriteSchema", True)
-    .saveAsTable(f"{DATABASE_NAME}.dim_restaurant")
-)
+# COMMAND ----------
 
-print(f"dim_restaurant: {df_dim_restaurant.count()} rows")
-display(df_dim_restaurant.limit(10))
+# MAGIC %md
+# MAGIC ### 3.2 SCD Type 2 Merge on dim_restaurant
+# MAGIC - First run: creates the table with initial load
+# MAGIC - Subsequent runs: expires changed rows, inserts new current rows
+
+# COMMAND ----------
+
+table_name = f"{DATABASE_NAME}.dim_restaurant"
+
+if spark.catalog.tableExists(table_name):
+    print("dim_restaurant exists — applying SCD Type 2 merge...")
+
+    target = DeltaTable.forName(spark, table_name)
+
+    # Step 1: Expire changed rows
+    target.alias("t").merge(
+        df_staging_restaurant.alias("s"),
+        """
+        t.restaurant_name = s.restaurant_name
+        AND t.source_city = s.source_city
+        AND COALESCE(t.license_number, '') = COALESCE(s.license_number, '')
+        AND t.is_current = True
+        """
+    ).whenMatchedUpdate(
+        condition="""
+            COALESCE(t.facility_type, '') != COALESCE(s.facility_type, '')
+            OR COALESCE(t.risk_category, '') != COALESCE(s.risk_category, '')
+            OR COALESCE(t.aka_name, '') != COALESCE(s.aka_name, '')
+        """,
+        set={
+            "effective_end_date": current_date(),
+            "is_current": lit(False),
+            "updated_at": current_timestamp()
+        }
+    ).execute()
+
+    print("Step 1: Expired changed rows.")
+
+    # Step 2: Insert new current rows for changed + brand new records
+    new_or_changed = spark.sql(f"""
+        SELECT s.*
+        FROM staging_restaurant s
+        LEFT JOIN {table_name} t
+        ON s.restaurant_name = t.restaurant_name
+           AND s.source_city = t.source_city
+           AND COALESCE(s.license_number, '') = COALESCE(t.license_number, '')
+           AND t.is_current = True
+        WHERE t.restaurant_key IS NULL
+    """)
+
+    if new_or_changed.count() > 0:
+        max_key = spark.sql(f"SELECT COALESCE(MAX(restaurant_key), 0) AS mk FROM {table_name}").collect()[0]["mk"]
+
+        new_rows = (
+            new_or_changed
+            .withColumn("restaurant_key", monotonically_increasing_id() + max_key + 1)
+            .withColumn("effective_start_date", current_date())
+            .withColumn("effective_end_date", lit("9999-12-31").cast("date"))
+            .withColumn("is_current", lit(True))
+        )
+        new_rows = add_gold_lineage(new_rows)
+        new_rows.write.format("delta").mode("append").saveAsTable(table_name)
+        print(f"Step 2: Inserted {new_rows.count()} new/updated rows.")
+    else:
+        print("Step 2: No new or changed records.")
+
+else:
+    print("dim_restaurant does not exist — creating initial load...")
+
+    df_dim_restaurant = (
+        df_staging_restaurant
+        .withColumn("restaurant_key", monotonically_increasing_id())
+        .withColumn("effective_start_date", current_date())
+        .withColumn("effective_end_date", lit("9999-12-31").cast("date"))
+        .withColumn("is_current", lit(True))
+    )
+    df_dim_restaurant = add_gold_lineage(df_dim_restaurant)
+
+    (
+        df_dim_restaurant.write
+        .format("delta")
+        .mode("overwrite")
+        .option("overwriteSchema", True)
+        .saveAsTable(table_name)
+    )
+    print(f"Initial load: {df_dim_restaurant.count()} rows")
+
+# COMMAND ----------
+
+# Show SCD2 state
+display(spark.sql(f"""
+    SELECT is_current, COUNT(*) AS row_count
+    FROM {DATABASE_NAME}.dim_restaurant
+    GROUP BY is_current
+"""))
+
+dim_restaurant = spark.table(f"{DATABASE_NAME}.dim_restaurant")
+print(f"dim_restaurant total: {dim_restaurant.count()} rows")
+display(dim_restaurant.filter(col("is_current") == True).limit(10))
 
 # COMMAND ----------
 
@@ -317,8 +418,8 @@ display(df_dim_violation.limit(20))
 
 # COMMAND ----------
 
-# Reload dims to get surrogate keys
-dim_restaurant = spark.table(f"{DATABASE_NAME}.dim_restaurant")
+# Reload dims to get surrogate keys (filter dim_restaurant for current rows only)
+dim_restaurant = spark.table(f"{DATABASE_NAME}.dim_restaurant").filter(col("is_current") == True)
 dim_location = spark.table(f"{DATABASE_NAME}.dim_location")
 dim_inspection_type = spark.table(f"{DATABASE_NAME}.dim_inspection_type")
 dim_date = spark.table(f"{DATABASE_NAME}.dim_date")
@@ -333,7 +434,7 @@ dim_date = spark.table(f"{DATABASE_NAME}.dim_date")
 df_chi_fact = (
     df_chi_insp
     .join(
-        dim_restaurant.filter(col("is_current") == True).select("restaurant_key", "restaurant_name", "license_number", "source_city"),
+        dim_restaurant.select("restaurant_key", "restaurant_name", "license_number", "source_city"),
         (df_chi_insp["DBA_Name"] == dim_restaurant["restaurant_name"]) &
         (df_chi_insp["License"].cast("string") == dim_restaurant["license_number"]) &
         (df_chi_insp["source_city"] == dim_restaurant["source_city"]),
