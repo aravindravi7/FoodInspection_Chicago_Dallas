@@ -77,6 +77,9 @@ df_chicago_clean = (
     .withColumn("Zip", when(length(col("Zip")) == 4, concat_ws("", lit("0"), col("Zip"))).otherwise(col("Zip")))
     # Parse Inspection Date
     .withColumn("Inspection_Date", to_date(col("Inspection_Date"), "MM/dd/yyyy"))
+    # Cast Latitude/Longitude to double (use try_cast to handle bad data like ' RODENTS' → null)
+    .withColumn("Latitude", expr("try_cast(Latitude as double)"))
+    .withColumn("Longitude", expr("try_cast(Longitude as double)"))
     # Add source city
     .withColumn("source_city", lit("Chicago"))
 )

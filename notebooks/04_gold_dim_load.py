@@ -16,7 +16,7 @@ spark.sql(f"USE {DATABASE_NAME}")
 # COMMAND ----------
 
 from pyspark.sql.functions import (
-    col, lit, when, coalesce, trim, upper, concat, concat_ws,
+    col, lit, when, coalesce, trim, upper, concat, concat_ws, expr,
     monotonically_increasing_id, row_number, dense_rank,
     year, month, dayofmonth, dayofweek, quarter, date_format,
     min as spark_min, max as spark_max, current_date, current_timestamp
@@ -302,28 +302,28 @@ display(dim_restaurant.filter(col("is_current") == True).limit(10))
 
 # COMMAND ----------
 
-# Chicago locations
+# Chicago locations (Latitude/Longitude already cleaned in Silver; re-cast as safety net)
 df_chi_locations = (
     df_chi_insp.select(
         col("Address").alias("address"),
         col("City").alias("city"),
         col("State").alias("state"),
         col("Zip").alias("zip"),
-        col("Latitude").cast("double").alias("latitude"),
-        col("Longitude").cast("double").alias("longitude"),
+        expr("try_cast(Latitude as double)").alias("latitude"),
+        expr("try_cast(Longitude as double)").alias("longitude"),
         col("source_city")
     ).distinct()
 )
 
-# Dallas locations
+# Dallas locations (Latitude/Longitude already cleaned in Silver; re-cast as safety net)
 df_dal_locations = (
     df_dal_insp.select(
         col("Street_Address").alias("address"),
         col("City").alias("city"),
         col("State").alias("state"),
         col("Zip_Code").alias("zip"),
-        col("Latitude").cast("double").alias("latitude"),
-        col("Longitude").cast("double").alias("longitude"),
+        expr("try_cast(Latitude as double)").alias("latitude"),
+        expr("try_cast(Longitude as double)").alias("longitude"),
         col("source_city")
     ).distinct()
 )
