@@ -170,33 +170,28 @@ print(f"  Verification: {changed_count_2}")
 
 # COMMAND ----------
 
-from pyspark.sql import Row
+# Create a new restaurant row by duplicating an existing row and changing key fields
+# This avoids schema/type mismatch issues
+from pyspark.sql.functions import when, lit
 
-# Get schema from existing data
-sample_row = df_raw.limit(1).collect()[0].asDict()
+new_restaurant = (
+    df_modified.limit(1)
+    .withColumn("Inspection ID", lit(9999999))
+    .withColumn("DBA Name", lit("SCD2_TEST_NEW_RESTAURANT"))
+    .withColumn("AKA Name", lit("SCD2 TEST NEW"))
+    .withColumn("License #", lit(9999999))
+    .withColumn("Facility Type", lit("Test Facility"))
+    .withColumn("Risk", lit("Risk 2 (Medium)"))
+    .withColumn("Address", lit("123 TEST STREET"))
+    .withColumn("City", lit("CHICAGO"))
+    .withColumn("State", lit("IL"))
+    .withColumn("Zip", lit("60601"))
+    .withColumn("Inspection Type", lit("Canvass"))
+    .withColumn("Results", lit("Pass"))
+    .withColumn("Violations", lit("1. TEST VIOLATION - Comments: SCD2 test violation"))
+)
 
-# Create a new restaurant row with all required fields
-new_row = sample_row.copy()
-new_row["Inspection ID"] = 9999999
-new_row["DBA Name"] = "SCD2_TEST_NEW_RESTAURANT"
-new_row["AKA Name"] = "SCD2 TEST NEW"
-new_row["License #"] = 9999999
-new_row["Facility Type"] = "Test Facility"
-new_row["Risk"] = "Risk 2 (Medium)"
-new_row["Address"] = "123 TEST STREET"
-new_row["City"] = "CHICAGO"
-new_row["State"] = "IL"
-new_row["Zip"] = "60601"
-new_row["Inspection Date"] = "04/12/2026"
-new_row["Inspection Type"] = "Canvass"
-new_row["Results"] = "Pass"
-new_row["Violations"] = "1. TEST VIOLATION - Comments: SCD2 test violation"
-new_row["Latitude"] = 41.8781
-new_row["Longitude"] = -87.6298
-new_row["Location"] = "(41.8781, -87.6298)"
-
-new_row_df = spark.createDataFrame([Row(**new_row)])
-df_modified = df_modified.unionByName(new_row_df, allowMissingColumns=True)
+df_modified = df_modified.unionByName(new_restaurant)
 
 print(f"TEST 3: Added new restaurant 'SCD2_TEST_NEW_RESTAURANT' (License: 9999999)")
 print(f"Modified CSV rows: {df_modified.count()} (was {df_raw.count()})")
